@@ -102,19 +102,20 @@ Current:
 - Generic HTML forms
 - Greenhouse
 - Lever
+- Workday, including its semantic comboboxes and repeated employment/education cards
 
 Not in this version:
 
-- Workday
 - Ashby
 - iCIMS
 - Taleo
 
 ## Limitations
 
-- Custom widgets (div dropdowns, closed shadow roots, Workday-style controls) are not filled reliably. Recognized custom dropdowns are marked for review.
+- Unknown custom widgets and closed shadow roots are left for review. Supported Workday comboboxes are filled only when one option matches unambiguously.
 - Resume parsing is not implemented. You can store a resume filename as a reminder; the file is not uploaded.
 - Complex salary, state, and country dropdowns are filled only when an option clearly matches.
+- Demographic answers are never inferred. Exact saved answers require the global sensitive-answer setting, which defaults off.
 - Confirmation detection only suggests “Looks like you submitted an application. Save it?” It does not record an application until you confirm.
 - Embedded forms on a company domain are scanned when you open the popup on that tab. Greenhouse and Lever iframes are also covered by the host content scripts.
 
@@ -123,7 +124,7 @@ Not in this version:
 ```text
 src/classifier/          rules, normalization, confidence
 src/content/             scanner, filler, observer, page controller
-src/adapters/            generic, Greenhouse, Lever
+src/adapters/            generic, Greenhouse, Lever, Workday
 src/profile/             local profile model
 src/applicationTracker/  local “save this application?” flow
 src/ui/popup/            extension popup

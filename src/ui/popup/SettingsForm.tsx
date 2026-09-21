@@ -38,10 +38,12 @@ export function SettingsForm({ settings, onChange }: SettingsFormProps) {
         onChange={(showFieldIndicators) => patch({ showFieldIndicators })}
       />
       <Toggle
-        label="Never autofill sensitive demographic questions"
-        description="Race, gender, disability, veteran status, religion, and sexual orientation stay manual."
-        checked={settings.neverAutofillSensitive}
-        onChange={(neverAutofillSensitive) => patch({ neverAutofillSensitive })}
+        label="Autofill saved demographic/self-identification answers"
+        description="Off by default. Only answers you explicitly save are used; ApplyLocal never infers demographic information."
+        checked={settings.autofillSensitiveDemographics}
+        onChange={(autofillSensitiveDemographics) =>
+          patch({ autofillSensitiveDemographics, neverAutofillSensitive: !autofillSensitiveDemographics })
+        }
       />
       <label className="slider">
         <span>Autofill threshold <strong>{Math.round(settings.autofillThreshold * 100)}%</strong></span>

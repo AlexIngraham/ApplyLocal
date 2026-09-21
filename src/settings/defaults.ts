@@ -12,6 +12,7 @@ export function createDefaultSettings(): Settings {
     reviewThreshold: 0.65,
     enableSiteAdapters: true,
     showFieldIndicators: true,
+    autofillSensitiveDemographics: false,
     neverAutofillSensitive: true,
     disabledFields: [],
   }
@@ -31,6 +32,10 @@ export function mergeSettings(value: unknown): Settings {
   let autofillThreshold = clamp(raw.autofillThreshold, base.autofillThreshold)
   if (autofillThreshold < reviewThreshold + 0.05) autofillThreshold = Math.min(0.99, reviewThreshold + 0.05)
   if (reviewThreshold >= autofillThreshold) reviewThreshold = Math.max(0.5, autofillThreshold - 0.05)
+  const autofillSensitiveDemographics =
+    typeof raw.autofillSensitiveDemographics === 'boolean'
+      ? raw.autofillSensitiveDemographics
+      : raw.neverAutofillSensitive === false
   return {
     version: 1,
     enabled: raw.enabled !== false,
@@ -39,7 +44,8 @@ export function mergeSettings(value: unknown): Settings {
     reviewThreshold,
     enableSiteAdapters: raw.enableSiteAdapters !== false,
     showFieldIndicators: raw.showFieldIndicators !== false,
-    neverAutofillSensitive: raw.neverAutofillSensitive !== false,
+    autofillSensitiveDemographics,
+    neverAutofillSensitive: !autofillSensitiveDemographics,
     disabledFields: Array.isArray(raw.disabledFields) ? raw.disabledFields.filter((item) => isCanonicalField(item)) : [],
   }
 }

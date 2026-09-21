@@ -36,8 +36,11 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
           <Text label="Preferred name" value={profile.personal.preferredName} onChange={(preferredName) => patch({ personal: { ...profile.personal, preferredName } })} />
           <Text label="Email" type="email" value={profile.personal.email} onChange={(email) => patch({ personal: { ...profile.personal, email } })} />
           <Text label="Phone" type="tel" value={profile.personal.phone} onChange={(phone) => patch({ personal: { ...profile.personal, phone } })} />
-          <Text label="Street address" value={profile.personal.address} onChange={(address) => patch({ personal: { ...profile.personal, address } })} />
+          <Text label="Phone extension" value={profile.personal.phoneExtension} onChange={(phoneExtension) => patch({ personal: { ...profile.personal, phoneExtension } })} />
+          <Text label="Address line 1" value={profile.personal.address} onChange={(address) => patch({ personal: { ...profile.personal, address } })} />
+          <Text label="Address line 2" value={profile.personal.addressLine2} onChange={(addressLine2) => patch({ personal: { ...profile.personal, addressLine2 } })} />
           <Text label="City" value={profile.personal.city} onChange={(city) => patch({ personal: { ...profile.personal, city } })} />
+          <Text label="County" value={profile.personal.county} onChange={(county) => patch({ personal: { ...profile.personal, county } })} />
           <Text label="State" value={profile.personal.state} onChange={(state) => patch({ personal: { ...profile.personal, state } })} />
           <Text label="ZIP" value={profile.personal.zip} onChange={(zip) => patch({ personal: { ...profile.personal, zip } })} />
           <Text label="Country" value={profile.personal.country} onChange={(country) => patch({ personal: { ...profile.personal, country } })} />
@@ -49,6 +52,8 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
           <Text label="LinkedIn" value={profile.links.linkedin} onChange={(linkedin) => patch({ links: { ...profile.links, linkedin } })} />
           <Text label="GitHub" value={profile.links.github} onChange={(github) => patch({ links: { ...profile.links, github } })} />
           <Text label="Portfolio" value={profile.links.portfolio} onChange={(portfolio) => patch({ links: { ...profile.links, portfolio } })} />
+          <Text label="Website" value={profile.links.website} onChange={(website) => patch({ links: { ...profile.links, website } })} />
+          <Text label="Project website" value={profile.links.projectWebsite} onChange={(projectWebsite) => patch({ links: { ...profile.links, projectWebsite } })} />
         </div>
       </details>
       <details>
@@ -105,8 +110,8 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
       <details>
         <summary>Sensitive questions</summary>
         <p className="quiet">
-          These are never inferred. Autofill stays off unless you save an answer for that exact category and turn on its checkbox.
-          {sensitiveLocked ? ' The safety switch in Settings currently blocks all of them.' : ''}
+          These answers are stored locally and never inferred. Autofill requires an exact saved answer and the global sensitive-demographics setting.
+          {sensitiveLocked ? ' The global setting currently blocks all of them.' : ''}
         </p>
         {SENSITIVE_CATEGORIES.map((category) => (
           <div className="sensitive" key={category}>
@@ -115,22 +120,6 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
               value={profile.sensitive[category].value}
               onChange={(value) => patch({ sensitive: { ...profile.sensitive, [category]: { ...profile.sensitive[category], value } } })}
             />
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={profile.sensitive[category].autofillEnabled}
-                disabled={sensitiveLocked}
-                onChange={(event) =>
-                  patch({
-                    sensitive: {
-                      ...profile.sensitive,
-                      [category]: { ...profile.sensitive[category], autofillEnabled: event.target.checked },
-                    },
-                  })
-                }
-              />
-              Allow autofill for this category
-            </label>
           </div>
         ))}
       </details>

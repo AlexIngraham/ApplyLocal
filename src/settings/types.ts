@@ -8,6 +8,8 @@ export interface Settings {
   reviewThreshold: number
   enableSiteAdapters: boolean
   showFieldIndicators: boolean
+  autofillSensitiveDemographics: boolean
+  /** Legacy inverse safety flag retained for stored-settings compatibility. */
   neverAutofillSensitive: boolean
   disabledFields: CanonicalField[]
 }

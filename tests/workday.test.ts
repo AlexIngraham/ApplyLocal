@@ -32,9 +32,14 @@ describe('Workday discovery', () => {
       ['wd-last', 'lastName'],
       ['wd-email', 'email'],
       ['wd-phone', 'phone'],
+      ['wd-phone-extension', 'phoneExtension'],
       ['wd-address', 'address'],
+      ['wd-address-2', 'addressLine2'],
       ['wd-city', 'city'],
+      ['wd-county', 'county'],
       ['wd-zip', 'zip'],
+      ['wd-website', 'website'],
+      ['wd-project-website', 'projectWebsite'],
       ['wd-school', 'school'],
       ['wd-degree', 'degree'],
       ['wd-major', 'major'],
@@ -57,6 +62,11 @@ describe('Workday discovery', () => {
     await applyDetectedFields(fields, 'auto')
     expect((document.getElementById('wd-first') as HTMLInputElement).value).toBe('Jordan')
     expect((document.getElementById('wd-address') as HTMLInputElement).value).toBe('100 Congress Ave')
+    expect((document.getElementById('wd-address-2') as HTMLInputElement).value).toBe('Suite 200')
+    expect((document.getElementById('wd-county') as HTMLInputElement).value).toBe('Travis')
+    expect((document.getElementById('wd-phone-extension') as HTMLInputElement).value).toBe('')
+    expect((document.getElementById('wd-website') as HTMLInputElement).value).toBe('https://jordanlee.example/about')
+    expect((document.getElementById('wd-project-website') as HTMLInputElement).value).toBe('https://project.jordanlee.example')
     expect((document.getElementById('wd-school') as HTMLInputElement).value).toBe('State University')
     expect((document.getElementById('wd-degree') as HTMLInputElement).value).toBe('B.S.')
     expect((document.getElementById('wd-major') as HTMLInputElement).value).toBe('Computer Science')
@@ -319,6 +329,110 @@ describe('Workday repeated sections', () => {
     const company = rescans[0] ? fieldById(rescans[0].fields, 'job-3-company') : undefined
     expect(company?.repeatedSection).toMatchObject({ kind: 'employment', sectionIndex: 2 })
     expect(company?.proposedValue).toBe('Company Gamma')
+  })
+
+  it('normalizes From and To dates per control and leaves a current role end date blank', async () => {
+    renderFixture('workday-dates-auth-sensitive.html')
+    const profile = testProfile()
+    profile.employment = [
+      {
+        id: 'job-dated',
+        company: '',
+        jobTitle: '',
+        startDate: '2023-05-17',
+        endDate: '08/20/2023',
+        current: false,
+        location: '',
+        description: '',
+      },
+      {
+        id: 'job-current',
+        company: '',
+        jobTitle: '',
+        startDate: '2024-06',
+        endDate: '',
+        current: true,
+        location: '',
+        description: '',
+      },
+    ]
+    const result = scanDocument(document, {
+      url: 'https://acme.myworkdayjobs.com/job/2',
+      profile,
+      settings: testSettings(),
+    })
+    expect(fieldById(result.fields, 'job-1-from')).toMatchObject({ canonical: 'employmentStart', proposedValue: '2023-05-17' })
+    expect(fieldById(result.fields, 'job-1-to')).toMatchObject({ canonical: 'employmentEnd', proposedValue: '08/20/2023' })
+    expect(fieldById(result.fields, 'job-2-from-month')).toMatchObject({ canonical: 'employmentStart', proposedValue: '2024-06' })
+    expect(fieldById(result.fields, 'job-2-from-year')).toMatchObject({ canonical: 'employmentStart', proposedValue: '2024-06' })
+    expect(fieldById(result.fields, 'job-2-to-month')).toMatchObject({ canonical: 'employmentEnd', proposedValue: null })
+    expect(fieldById(result.fields, 'job-2-current')).toMatchObject({ canonical: 'currentPosition', proposedValue: 'yes' })
+
+    await applyDetectedFields(
+      result.fields.filter((field) => field.repeatedSection?.kind === 'employment'),
+      'auto',
+    )
+    expect((document.getElementById('job-1-from') as HTMLInputElement).value).toBe('05/2023')
+    expect((document.getElementById('job-1-to') as HTMLInputElement).value).toBe('08/20/2023')
+    expect((document.getElementById('job-2-from-month') as HTMLSelectElement).value).toBe('6')
+    expect((document.getElementById('job-2-from-year') as HTMLSelectElement).value).toBe('2024')
+    expect((document.getElementById('job-2-to-month') as HTMLSelectElement).value).toBe('')
+    expect((document.getElementById('job-2-to-year') as HTMLSelectElement).value).toBe('')
+    expect((document.getElementById('job-2-current') as HTMLInputElement).checked).toBe(true)
+  })
+})
+
+describe('Workday eligibility and sensitive answers', () => {
+  it('fills work authorization across radio, select, and custom combobox controls', async () => {
+    const { fields } = scanFixture('workday-dates-auth-sensitive.html', 'https://acme.myworkdayjobs.com/job/2')
+    for (const id of ['auth-radio-yes', 'auth-select', 'auth-combo']) {
+      expect(fieldById(fields, id)).toMatchObject({ canonical: 'workAuthorization', proposedValue: 'yes' })
+    }
+    const combo = document.getElementById('auth-combo') as HTMLInputElement
+    document.querySelectorAll<HTMLElement>('#auth-options [role="option"]').forEach((option) => {
+      option.addEventListener('click', () => {
+        combo.value = option.textContent || ''
+        combo.setAttribute('aria-expanded', 'false')
+        option.setAttribute('aria-selected', 'true')
+      })
+    })
+    await applyDetectedFields(fields, 'auto')
+    expect((document.getElementById('auth-radio-yes') as HTMLInputElement).checked).toBe(true)
+    expect((document.getElementById('auth-select') as HTMLSelectElement).value).toBe('yes')
+    expect(combo.value).toBe('Yes')
+  })
+
+  it('requires the global gate and an exact saved demographic answer', async () => {
+    renderFixture('workday-dates-auth-sensitive.html')
+    const profile = testProfile()
+    profile.sensitive.race = { value: 'Asian', autofillEnabled: false }
+    profile.sensitive.ethnicity = { value: 'Hispanic or Latino', autofillEnabled: false }
+    profile.sensitive.gender = { value: 'Female', autofillEnabled: false }
+    profile.sensitive.veteran = { value: 'I am not a protected veteran', autofillEnabled: false }
+
+    const blocked = scanDocument(document, {
+      url: 'https://acme.myworkdayjobs.com/job/2',
+      profile,
+      settings: testSettings(),
+    })
+    for (const id of ['race', 'ethnicity', 'gender', 'veteran']) {
+      expect(fieldById(blocked.fields, id)).toMatchObject({ fillBand: 'blocked', proposedValue: null })
+    }
+
+    const enabled = scanDocument(document, {
+      url: 'https://acme.myworkdayjobs.com/job/2',
+      profile,
+      settings: testSettings({ autofillSensitiveDemographics: true }),
+    })
+    expect(fieldById(enabled.fields, 'race')?.canonical).toBe('sensitive.race')
+    expect(fieldById(enabled.fields, 'ethnicity')?.canonical).toBe('sensitive.ethnicity')
+    expect(fieldById(enabled.fields, 'gender')?.canonical).toBe('sensitive.gender')
+    expect(fieldById(enabled.fields, 'veteran')?.canonical).toBe('sensitive.veteran')
+    await applyDetectedFields(enabled.fields.filter((field) => field.sensitive), 'auto')
+    expect((document.getElementById('race') as HTMLSelectElement).value).toBe('asian')
+    expect((document.getElementById('ethnicity') as HTMLSelectElement).value).toBe('hispanic')
+    expect((document.getElementById('gender') as HTMLSelectElement).value).toBe('female')
+    expect((document.getElementById('veteran') as HTMLSelectElement).value).toBe('not-protected')
   })
 })
 

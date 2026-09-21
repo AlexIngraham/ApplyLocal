@@ -60,10 +60,16 @@ export function resolveProfileValue(
       return text(personal.email)
     case 'phone':
       return text(personal.phone)
+    case 'phoneExtension':
+      return text(personal.phoneExtension)
     case 'address':
       return text(personal.address)
+    case 'addressLine2':
+      return text(personal.addressLine2)
     case 'city':
       return text(personal.city)
+    case 'county':
+      return text(personal.county)
     case 'state':
       return text(personal.state)
     case 'zip':
@@ -76,6 +82,10 @@ export function resolveProfileValue(
       return text(links.github)
     case 'portfolio':
       return text(links.portfolio)
+    case 'website':
+      return text(links.website)
+    case 'projectWebsite':
+      return text(links.projectWebsite)
     case 'school':
       return text(educationAt(profile, repeatedIndex)?.school)
     case 'degree':
@@ -171,17 +181,15 @@ export function proposedValue(
 ): ProposedValue | null {
   const category = sensitiveCategory(key)
   if (category) {
-    if (settings.neverAutofillSensitive) return null
+    if (!settings.autofillSensitiveDemographics) return null
     const answer = profile.sensitive[category]
-    if (!answer.autofillEnabled) return null
     return text(answer.value)
   }
   return resolveProfileValue(profile, key, index, repeatedSection)
 }
 
-export function sensitiveBlocked(profile: Profile, settings: Settings, key: CanonicalField): boolean {
+export function sensitiveBlocked(_profile: Profile, settings: Settings, key: CanonicalField): boolean {
   const category = sensitiveCategory(key)
   if (!category) return false
-  if (settings.neverAutofillSensitive) return true
-  return !profile.sensitive[category].autofillEnabled
+  return !settings.autofillSensitiveDemographics
 }

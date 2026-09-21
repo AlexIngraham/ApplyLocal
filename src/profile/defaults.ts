@@ -27,8 +27,11 @@ export function emptyPersonal(): PersonalInfo {
     preferredName: '',
     email: '',
     phone: '',
+    phoneExtension: '',
     address: '',
+    addressLine2: '',
     city: '',
+    county: '',
     state: '',
     zip: '',
     country: '',
@@ -36,7 +39,7 @@ export function emptyPersonal(): PersonalInfo {
 }
 
 export function emptyLinks(): LinkInfo {
-  return { linkedin: '', github: '', portfolio: '' }
+  return { linkedin: '', github: '', portfolio: '', website: '', projectWebsite: '' }
 }
 
 export function emptyDefaults(): ApplicationDefaults {
@@ -138,8 +141,11 @@ export function mergeProfile(value: unknown): Profile {
       preferredName: asString(personal.preferredName),
       email: asString(personal.email),
       phone: asString(personal.phone),
+      phoneExtension: asString(personal.phoneExtension),
       address: asString(personal.address),
+      addressLine2: asString(personal.addressLine2),
       city: asString(personal.city),
+      county: asString(personal.county),
       state: asString(personal.state),
       zip: asString(personal.zip),
       country: asString(personal.country),
@@ -148,6 +154,8 @@ export function mergeProfile(value: unknown): Profile {
       linkedin: asString(links.linkedin),
       github: asString(links.github),
       portfolio: asString(links.portfolio),
+      website: asString(links.website),
+      projectWebsite: asString(links.projectWebsite),
     },
     education: Array.isArray(raw.education)
       ? raw.education.map((entry) => ({
@@ -207,8 +215,11 @@ export function createSampleProfile(): Profile {
     preferredName: 'Jordan',
     email: 'jordan.lee@example.com',
     phone: '555-0100',
+    phoneExtension: '',
     address: '100 Congress Ave',
+    addressLine2: 'Suite 200',
     city: 'Austin',
+    county: 'Travis',
     state: 'TX',
     zip: '78701',
     country: 'United States',
@@ -217,6 +228,8 @@ export function createSampleProfile(): Profile {
     linkedin: 'https://www.linkedin.com/in/jordanlee-example',
     github: 'https://github.com/jordanlee-example',
     portfolio: 'https://jordanlee.example',
+    website: 'https://jordanlee.example/about',
+    projectWebsite: 'https://project.jordanlee.example',
   }
   profile.education = [
     {

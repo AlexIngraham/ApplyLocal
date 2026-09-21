@@ -21,8 +21,11 @@ export interface PersonalInfo {
   preferredName: string
   email: string
   phone: string
+  phoneExtension: string
   address: string
+  addressLine2: string
   city: string
+  county: string
   state: string
   zip: string
   country: string
@@ -32,6 +35,8 @@ export interface LinkInfo {
   linkedin: string
   github: string
   portfolio: string
+  website: string
+  projectWebsite: string
 }
 
 export interface EducationEntry {

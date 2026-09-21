@@ -123,7 +123,7 @@ export function App() {
         {tab === 'profile' ? (
           <ProfileForm
             profile={profile}
-            sensitiveLocked={settings.neverAutofillSensitive}
+            sensitiveLocked={!settings.autofillSensitiveDemographics}
             onChange={setProfile}
             onSample={() => {
               if (profile.personal.firstName && !window.confirm('Replace the current profile with sample data?')) return

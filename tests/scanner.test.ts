@@ -58,6 +58,30 @@ describe('fixture scanning', () => {
     const relocate = result.fields.find((field) => field.canonical === 'relocation')
     expect(relocate?.control.kind).toBe('radio')
   })
+
+  it('keeps second address lines, counties, extensions, and website types distinct', async () => {
+    const result = scanFixture('distinct-fields.html', 'https://example.com/jobs/2')
+    const expected = {
+      line1: ['address', '100 Congress Ave'],
+      line2: ['addressLine2', 'Suite 200'],
+      county: ['county', 'Travis'],
+      country: ['country', 'United States'],
+      extension: ['phoneExtension', null],
+      website: ['website', 'https://jordanlee.example/about'],
+      'project-website': ['projectWebsite', 'https://project.jordanlee.example'],
+      portfolio: ['portfolio', 'https://jordanlee.example'],
+      linkedin: ['linkedin', 'https://www.linkedin.com/in/jordanlee-example'],
+      github: ['github', 'https://github.com/jordanlee-example'],
+    } as const
+    for (const [id, [canonical, proposedValue]] of Object.entries(expected)) {
+      expect(fieldById(result.fields, id)).toMatchObject({ canonical, proposedValue })
+    }
+    await applyDetectedFields(result.fields, 'auto')
+    expect((document.getElementById('line1') as HTMLInputElement).value).toBe('100 Congress Ave')
+    expect((document.getElementById('line2') as HTMLInputElement).value).toBe('Suite 200')
+    expect((document.getElementById('county') as HTMLInputElement).value).toBe('Travis')
+    expect((document.getElementById('country') as HTMLInputElement).value).toBe('United States')
+  })
 })
 
 describe('autofill', () => {
@@ -115,9 +139,9 @@ describe('autofill', () => {
     expect((document.getElementById('given') as HTMLInputElement).value).toBe('Jordan')
   })
 
-  it('can autofill a sensitive answer only after that category is explicitly enabled', () => {
+  it('can autofill a saved sensitive answer only after the global setting is explicitly enabled', () => {
     const profile = testProfile()
-    profile.sensitive.gender = { value: 'decline', autofillEnabled: true }
+    profile.sensitive.gender = { value: 'decline', autofillEnabled: false }
     renderFixture('greenhouse.html')
     const blocked = scanDocument(document, {
       url: 'https://boards.greenhouse.io/acme/jobs/123',
@@ -126,10 +150,17 @@ describe('autofill', () => {
     })
     expect(fieldById(blocked.fields, 'gender')?.fillBand).toBe('blocked')
     renderFixture('greenhouse.html')
+    const missing = scanDocument(document, {
+      url: 'https://boards.greenhouse.io/acme/jobs/123',
+      profile: testProfile(),
+      settings: testSettings({ autofillSensitiveDemographics: true }),
+    })
+    expect(fieldById(missing.fields, 'gender')?.proposedValue).toBeNull()
+    renderFixture('greenhouse.html')
     const allowed = scanDocument(document, {
       url: 'https://boards.greenhouse.io/acme/jobs/123',
       profile,
-      settings: testSettings({ neverAutofillSensitive: false }),
+      settings: testSettings({ autofillSensitiveDemographics: true }),
     })
     expect(fieldById(allowed.fields, 'gender')).toMatchObject({ fillBand: 'high', proposedValue: 'decline' })
   })

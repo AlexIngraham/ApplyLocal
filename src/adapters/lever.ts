@@ -11,7 +11,7 @@ const EXACT: Record<string, AdapterHint> = {
   'urls[LinkedIn]': { key: 'linkedin', confidence: 0.99, reason: 'Lever LinkedIn URL' },
   'urls[GitHub]': { key: 'github', confidence: 0.99, reason: 'Lever GitHub URL' },
   'urls[Portfolio]': { key: 'portfolio', confidence: 0.99, reason: 'Lever portfolio URL' },
-  'urls[Other]': { key: 'portfolio', confidence: 0.8, reason: 'Lever other URL' },
+  'urls[Other]': { key: 'website', confidence: 0.9, reason: 'Lever other website URL' },
   resume: { key: 'resume', confidence: 0.99, reason: 'Lever resume upload' },
 }
 

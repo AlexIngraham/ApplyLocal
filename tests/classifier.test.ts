@@ -30,10 +30,22 @@ describe('classifier labels', () => {
     ['E-mail address', 'email'],
     ['Mobile phone', 'phone'],
     ['Mobile', 'phone'],
+    ['Phone Extension', 'phoneExtension'],
+    ['Address Line 1', 'address'],
+    ['Address Line 2', 'addressLine2'],
+    ['Address 2', 'addressLine2'],
+    ['Apartment / Suite', 'addressLine2'],
+    ['Apt / Suite', 'addressLine2'],
+    ['County', 'county'],
+    ['Country', 'country'],
     ['LinkedIn profile', 'linkedin'],
     ['LinkedIn URL', 'linkedin'],
     ['GitHub URL', 'github'],
     ['GitHub Profile', 'github'],
+    ['Website', 'website'],
+    ['Project Website', 'projectWebsite'],
+    ['Portfolio URL', 'portfolio'],
+    ['Portfolio Website', 'portfolio'],
     ['University', 'school'],
     ['College', 'school'],
     ['School', 'school'],
@@ -44,6 +56,7 @@ describe('classifier labels', () => {
     ['Expected Graduation', 'graduationDate'],
     ['Eligible to work', 'workAuthorization'],
     ['Legally authorized to work', 'workAuthorization'],
+    ['Do you have authorization to work in the United States?', 'workAuthorization'],
     ['Require visa sponsorship', 'requiresSponsorship'],
     ['Require future sponsorship', 'requiresFutureSponsorship'],
     ['Willing to relocate', 'relocation'],
@@ -77,9 +90,17 @@ describe('classifier labels', () => {
   })
 
   it('does not treat work authorization as sponsorship', () => {
-    const result = fromLabel('Are you legally authorized to work in the United States?')
-    expect(result.key).toBe('workAuthorization')
-    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
+    for (const wording of [
+      'Are you legally authorized to work in the United States?',
+      'Are you authorized to work in the U.S.?',
+      'Are you legally eligible to work in the United States?',
+      'Are you eligible to work in the United States?',
+      'Do you have authorization to work in the United States?',
+    ]) {
+      const result = fromLabel(wording)
+      expect(result.key, wording).toBe('workAuthorization')
+      expect(result.confidence, wording).toBeGreaterThanOrEqual(0.9)
+    }
   })
 
   it('leaves mixed authorization and sponsorship questions for review', () => {
@@ -109,6 +130,12 @@ describe('classifier labels', () => {
     expect(fromLabel('Sexual orientation').key).toBe('sensitive.sexualOrientation')
     expect(fromLabel('Race/Ethnicity').key.startsWith('sensitive.')).toBe(true)
     expect(fromLabel('Disability')).toMatchObject({ key: 'sensitive.disability', sensitive: true })
+    expect(fromLabel('Please identify your race.').key).toBe('sensitive.race')
+    expect(fromLabel('Are you Hispanic or Latino?').key).toBe('sensitive.ethnicity')
+    expect(fromLabel('Please select your gender.').key).toBe('sensitive.gender')
+    expect(fromLabel('Please select the veteran status which most accurately describes how you identify yourself.').key).toBe(
+      'sensitive.veteran',
+    )
   })
 
   it('does not let nearby equal-opportunity text mark an email field sensitive', () => {
@@ -126,6 +153,12 @@ describe('classifier labels', () => {
     expect(fromLabel('Start date').confidence).toBeLessThan(0.65)
     expect(fromLabel('Start date', { section: 'employment' }).key).toBe('employmentStart')
     expect(fromLabel('Start date', { section: 'education' }).key).toBe('educationStart')
+    expect(fromLabel('From').confidence).toBeLessThan(0.65)
+    expect(fromLabel('To').confidence).toBeLessThan(0.65)
+    expect(fromLabel('From', { section: 'employment' }).key).toBe('employmentStart')
+    expect(fromLabel('To', { section: 'employment' }).key).toBe('employmentEnd')
+    expect(fromLabel('From', { section: 'education' }).key).toBe('educationStart')
+    expect(fromLabel('To', { section: 'education' }).key).toBe('graduationDate')
   })
 
   it('caps nearby-only matches below the autofill threshold', () => {

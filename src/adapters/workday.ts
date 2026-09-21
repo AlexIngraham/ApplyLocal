@@ -10,6 +10,7 @@ import {
   workdayHintFor,
 } from '@/adapters/workdayDom'
 import { isWorkdayUrl } from '@/platform/detect'
+import { dateCandidatesForControl } from '@/content/dateFormat'
 
 export const workdayAdapter: ATSAdapter = {
   id: 'workday',
@@ -31,7 +32,13 @@ export const workdayAdapter: ATSAdapter = {
     if (field.control.kind === 'combobox' && field.control.multiValue && Array.isArray(value)) {
       return fillWorkdayMultiValueCombobox(field, value)
     }
-    if (field.control.kind === 'combobox' && typeof value === 'string') return fillWorkdayCombobox(field, value)
+    if (field.control.kind === 'combobox' && typeof value === 'string') {
+      const formatted = dateCandidatesForControl(field, value)
+      if (formatted && !formatted.length) {
+        return { ok: false, status: 'failed', message: 'Saved value does not fit this date field.' }
+      }
+      return fillWorkdayCombobox(field, formatted?.[0] ?? value)
+    }
     return fillControl(field, value)
   },
 }

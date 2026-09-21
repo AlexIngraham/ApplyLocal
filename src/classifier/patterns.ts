@@ -16,11 +16,11 @@ function seq(key: CanonicalField, phrase: string, confidence: number, reject?: R
 }
 
 const phoneReject: Reject = (tokens) =>
-  ['emergency', 'fax', 'reference', 'supervisor'].some((token) => tokens.includes(token))
+  ['emergency', 'fax', 'reference', 'supervisor', 'extension', 'ext'].some((token) => tokens.includes(token))
 const emailReject: Reject = (tokens) =>
   ['emergency', 'reference', 'supervisor', 'manager'].some((token) => tokens.includes(token))
 const addressReject: Reject = (tokens) =>
-  ['email', 'ip', 'apt', 'suite', '2'].some((token) => tokens.includes(token))
+  ['email', 'ip', 'apt', 'apartment', 'unit', 'suite', '2', 'second'].some((token) => tokens.includes(token))
 const cityReject: Reject = (tokens) => tokens.includes('citizenship') || tokens.includes('capacity')
 const stateReject: Reject = (tokens, text) =>
   tokens.includes('statement') || tokens.includes('united') || tokens.includes('status') || /\bplease state\b/.test(text)
@@ -55,6 +55,10 @@ const TOKEN_RULES: SeqRule[] = [
   seq('fullName', 'name', 0.9),
   seq('email', 'email address', 0.98, emailReject),
   seq('email', 'email', 0.97, emailReject),
+  seq('phoneExtension', 'phone extension', 0.98),
+  seq('phoneExtension', 'telephone extension', 0.97),
+  seq('phoneExtension', 'extension', 0.94),
+  seq('phoneExtension', 'ext', 0.92),
   seq('phone', 'phone number', 0.97, phoneReject),
   seq('phone', 'mobile phone', 0.97, phoneReject),
   seq('phone', 'cell phone', 0.96, phoneReject),
@@ -63,6 +67,15 @@ const TOKEN_RULES: SeqRule[] = [
   seq('phone', 'telephone', 0.95, phoneReject),
   seq('phone', 'cell', 0.9, phoneReject),
   seq('phone', 'tel', 0.9, phoneReject),
+  seq('addressLine2', 'address line 2', 0.98),
+  seq('addressLine2', 'address line two', 0.98),
+  seq('addressLine2', 'address 2', 0.98),
+  seq('addressLine2', 'address2', 0.97),
+  seq('addressLine2', 'apartment suite unit', 0.96),
+  seq('addressLine2', 'apartment', 0.94),
+  seq('addressLine2', 'apt', 0.94),
+  seq('addressLine2', 'suite', 0.94),
+  seq('addressLine2', 'unit', 0.92),
   seq('address', 'street address', 0.96, addressReject),
   seq('address', 'address line 1', 0.95, addressReject),
   seq('address', 'address1', 0.94, addressReject),
@@ -72,6 +85,8 @@ const TOKEN_RULES: SeqRule[] = [
   seq('city', 'city', 0.95, cityReject),
   seq('city', 'town', 0.9, cityReject),
   seq('city', 'location', 0.78, cityReject),
+  seq('county', 'county of residence', 0.97),
+  seq('county', 'county', 0.96),
   seq('state', 'state province', 0.9, stateReject),
   seq('state', 'province', 0.92, stateReject),
   seq('state', 'state', 0.93, stateReject),
@@ -90,11 +105,19 @@ const TOKEN_RULES: SeqRule[] = [
   seq('github', 'github url', 0.97),
   seq('github', 'git hub', 0.95),
   seq('github', 'github', 0.96),
-  seq('portfolio', 'personal website', 0.95),
-  seq('portfolio', 'personal site', 0.94),
+  seq('projectWebsite', 'project website', 0.98),
+  seq('projectWebsite', 'project site', 0.97),
+  seq('projectWebsite', 'project url', 0.97),
+  seq('portfolio', 'portfolio website', 0.97),
+  seq('portfolio', 'portfolio site', 0.96),
   seq('portfolio', 'portfolio url', 0.95),
   seq('portfolio', 'portfolio', 0.95),
-  seq('portfolio', 'website', 0.78),
+  seq('website', 'personal website', 0.96),
+  seq('website', 'personal site', 0.95),
+  seq('website', 'website url', 0.95),
+  seq('website', 'personal url', 0.94),
+  seq('website', 'other website', 0.93),
+  seq('website', 'website', 0.9),
   seq('school', 'school name', 0.95, schoolReject),
   seq('school', 'university', 0.94, schoolReject),
   seq('school', 'college', 0.94, schoolReject),
@@ -139,6 +162,7 @@ const TOKEN_RULES: SeqRule[] = [
   seq('employmentDescription', 'position description', 0.88),
   seq('employmentDescription', 'responsibilities', 0.86),
   seq('workAuthorization', 'work authorization', 0.96),
+  seq('workAuthorization', 'authorization to work', 0.96),
   seq('workAuthorization', 'authorized to work', 0.96),
   seq('workAuthorization', 'legally authorized', 0.95),
   seq('workAuthorization', 'eligible to work', 0.95),
@@ -189,8 +213,10 @@ const AUTOCOMPLETE: Record<string, { key: CanonicalField; confidence: number }> 
   email: { key: 'email', confidence: 0.99 },
   tel: { key: 'phone', confidence: 0.98 },
   'tel-national': { key: 'phone', confidence: 0.98 },
+  'tel-extension': { key: 'phoneExtension', confidence: 0.99 },
   'street-address': { key: 'address', confidence: 0.98 },
   'address-line1': { key: 'address', confidence: 0.98 },
+  'address-line2': { key: 'addressLine2', confidence: 0.99 },
   'address-level2': { key: 'city', confidence: 0.97 },
   'address-level1': { key: 'state', confidence: 0.97 },
   'postal-code': { key: 'zip', confidence: 0.98 },
@@ -251,6 +277,7 @@ function hasAuth(text: string): boolean {
     /\bauthori[sz]ed to work\b/.test(text) ||
     /\blegally authori[sz]ed\b/.test(text) ||
     /\bwork authori[sz]ation\b/.test(text) ||
+    /\bauthori[sz]ation to work\b/.test(text) ||
     /\beligible to work\b/.test(text) ||
     /\bright to work\b/.test(text)
   )
@@ -357,8 +384,10 @@ export function matchDate(text: string, section: 'education' | 'employment' | 'u
   if (/\bgraduation date\b|\bdate of graduation\b|\bgraduated\b/.test(text)) {
     return { key: 'graduationDate', confidence: 0.94, reason: 'Label mentions graduation date', specificity: 3 }
   }
-  const isStart = /\b(start|begin) date\b/.test(text) || text === 'start' || text === 'start date'
-  const isEnd = /\b(end|to) date\b/.test(text) || text === 'end date'
+  const contextualStart = section !== 'unknown' && /^(from|from month|from year)$/.test(text)
+  const contextualEnd = section !== 'unknown' && /^(to|to month|to year)$/.test(text)
+  const isStart = /\b(start|begin) (date|month|year)\b/.test(text) || text === 'start' || text === 'start date' || contextualStart
+  const isEnd = /\b(end|to) (date|month|year)\b/.test(text) || text === 'end date' || contextualEnd
   if (!isStart && !isEnd) return null
   if (section === 'education' || /\b(education|school|degree|academic)\b/.test(text)) {
     return isStart

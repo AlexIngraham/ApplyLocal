@@ -2,7 +2,7 @@ import type { AdapterHint, DetectedField, FillResult, RepeatedSectionMatch } fro
 import type { CanonicalField } from '@/classifier/types'
 import { normalize } from '@/classifier/normalize'
 import { matchChoice } from '@/content/matchers'
-import { ariaText, cleanText, cssEscape, labelForControl } from '@/utils/dom'
+import { ariaText, cleanText, cssEscape, describedBy, groupQuestion, labelForControl, previousPrompt } from '@/utils/dom'
 import { withSyntheticFill } from '@/utils/events'
 import { devLog } from '@/utils/logging'
 
@@ -20,10 +20,13 @@ const HINTS: Array<[RegExp, AdapterHint]> = [
   [/\b(last name|lastname|family name)\b/, hint('lastName', 'Workday last name field')],
   [/\b(preferred name|preferredname)\b/, hint('preferredName', 'Workday preferred name field')],
   [/\b(email address|emailaddress|email)\b/, hint('email', 'Workday email field')],
+  [/\b(phone extension|phoneextension|telephone extension|extension|ext)\b/, hint('phoneExtension', 'Workday phone extension field')],
   [/\b(phone number|phonenumber|mobile phone)\b/, hint('phone', 'Workday phone field')],
+  [/\b(address line 2|addressline2|apartment|suite|unit)\b/, hint('addressLine2', 'Workday address line 2 field')],
   [/\b(address line 1|addressline1|street address)\b/, hint('address', 'Workday street address field')],
   [/\b(postal code|postalcode|zip code)\b/, hint('zip', 'Workday postal code field')],
   [/\b(country)\b/, hint('country', 'Workday country field')],
+  [/\bcounty\b/, hint('county', 'Workday county field')],
   [/\b(state|region|province)\b/, hint('state', 'Workday state or region field')],
   [/\bcity\b/, hint('city', 'Workday city field')],
   [/\b(school|institution|university)\b/, hint('school', 'Workday school field')],
@@ -32,7 +35,9 @@ const HINTS: Array<[RegExp, AdapterHint]> = [
   [/\b(graduation date|graduationdate)\b/, hint('graduationDate', 'Workday graduation date field')],
   [/\blinked ?in\b/, hint('linkedin', 'Workday LinkedIn field')],
   [/\bgithub\b/, hint('github', 'Workday GitHub field')],
-  [/\b(portfolio|website)\b/, hint('portfolio', 'Workday portfolio field')],
+  [/\bproject (website|site|url)\b/, hint('projectWebsite', 'Workday project website field')],
+  [/\bportfolio\b/, hint('portfolio', 'Workday portfolio field')],
+  [/\b(personal website|personal site|website)\b/, hint('website', 'Workday website field')],
   [/\b(technical skills|skill input|skills)\b/, hint('skills', 'Workday skills field')],
 ]
 
@@ -59,21 +64,25 @@ export function workdayHintFor(el: Element): AdapterHint | null {
     el.getAttribute('aria-label'),
     ariaText(el),
     labelForControl(el),
+    groupQuestion(el),
+    describedBy(el),
+    previousPrompt(el),
     el.closest('[data-automation-id]')?.getAttribute('data-automation-id'),
   ]
   const text = normalize(pieces.filter(Boolean).join(' '))
   const repeated =
-    el instanceof HTMLElement && /\b(location|start date|startdate|end date|enddate)\b/.test(text)
+    el instanceof HTMLElement && /\b(location|start|from|end|to|current position|currently work|current job)\b/.test(text)
       ? findWorkdayRepeatedSection(el)
       : null
   if (repeated?.kind === 'employment') {
     if (/\b(work |job |employment )?location\b/.test(text)) return hint('employmentLocation', 'Location in a Workday experience card')
-    if (/\b(start date|startdate)\b/.test(text)) return hint('employmentStart', 'Start date in a Workday experience card')
-    if (/\b(end date|enddate)\b/.test(text)) return hint('employmentEnd', 'End date in a Workday experience card')
+    if (/\b(start ?date|start (month|year)|from( month| year)?)\b/.test(text)) return hint('employmentStart', 'Start date in a Workday experience card')
+    if (/\b(end ?date|end (month|year)|to( month| year)?)\b/.test(text)) return hint('employmentEnd', 'End date in a Workday experience card')
+    if (/\b(current position|currently work|current job)\b/.test(text)) return hint('currentPosition', 'Current-position control in a Workday experience card')
   }
   if (repeated?.kind === 'education') {
-    if (/\b(start date|startdate)\b/.test(text)) return hint('educationStart', 'Start date in a Workday education card')
-    if (/\b(end date|enddate)\b/.test(text)) return hint('graduationDate', 'End date in a Workday education card')
+    if (/\b(start ?date|start (month|year)|from( month| year)?)\b/.test(text)) return hint('educationStart', 'Start date in a Workday education card')
+    if (/\b(end ?date|end (month|year)|to( month| year)?)\b/.test(text)) return hint('graduationDate', 'End date in a Workday education card')
   }
   for (const [pattern, value] of HINTS) {
     if (pattern.test(text)) return value

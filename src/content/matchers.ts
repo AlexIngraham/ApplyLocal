@@ -1,3 +1,4 @@
+import { isSensitiveKey } from '@/classifier/types'
 import type { CanonicalField } from '@/classifier/types'
 import { normalize } from '@/classifier/normalize'
 import { COUNTRY_ALIASES, US_STATES } from '@/utils/states'
@@ -51,7 +52,40 @@ export function matchChoice(options: Choice[], desired: string, key: CanonicalFi
   if (key === 'desiredSalary') return matchSalary(options, cleaned) ?? matchLoose(options, cleaned)
   if (key === 'state') return matchState(options, cleaned) ?? matchLoose(options, cleaned)
   if (key === 'country') return matchCountry(options, cleaned) ?? matchLoose(options, cleaned)
+  if (isSensitiveKey(key)) return matchSensitiveChoice(options, cleaned)
   return matchLoose(options, cleaned)
+}
+
+const SENSITIVE_OPT_OUT_ALIASES = new Set([
+  'decline',
+  'decline to answer',
+  'decline to self identify',
+  'do not wish to answer',
+  'do not wish to disclose',
+  'do not wish to self identify',
+  'i do not wish to answer',
+  'i do not wish to disclose',
+  'i do not wish to self identify',
+  'prefer not to answer',
+  'prefer not to disclose',
+  'prefer not to say',
+  'prefer not to self identify',
+])
+
+export function matchSensitiveChoice(options: Choice[], desired: string): string | null {
+  const wanted = normalize(desired)
+  if (!wanted) return null
+  const exact = options.filter(
+    (option) => normalize(option.label) === wanted || normalize(option.value) === wanted,
+  )
+  if (exact.length === 1) return exact[0]?.value ?? null
+  if (!SENSITIVE_OPT_OUT_ALIASES.has(wanted)) return null
+  const optOut = options.filter((option) => {
+    const label = normalize(option.label)
+    const value = normalize(option.value)
+    return SENSITIVE_OPT_OUT_ALIASES.has(label) || SENSITIVE_OPT_OUT_ALIASES.has(value)
+  })
+  return optOut.length === 1 ? optOut[0]?.value ?? null : null
 }
 
 export function matchYesNo(options: Choice[], desired: string): string | null {
@@ -99,18 +133,41 @@ export function matchPreference(options: Choice[], desired: string): string | nu
 }
 
 export function toMonth(value: string): string | null {
-  const iso = value.trim().match(/^(\d{4})-(\d{2})(?:-\d{2})?$/)
-  if (iso) return `${iso[1]}-${iso[2]}`
-  const us = value.trim().match(/^(\d{1,2})\/(\d{4})$/)
-  if (us) return `${us[2]}-${us[1].padStart(2, '0')}`
-  return null
+  const parsed = parseDateParts(value)
+  return parsed ? `${parsed.year}-${parsed.month}` : null
 }
 
 export function toDate(value: string): string | null {
-  const full = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (full) return `${full[1]}-${full[2]}-${full[3]}`
-  const month = toMonth(value)
-  return month ? `${month}-01` : null
+  const parsed = parseDateParts(value)
+  return parsed ? `${parsed.year}-${parsed.month}-${parsed.day ?? '01'}` : null
+}
+
+export interface DateParts {
+  year: string
+  month: string
+  day: string | null
+}
+
+export function parseDateParts(value: string): DateParts | null {
+  const raw = value.trim()
+  const iso = raw.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/)
+  if (iso?.[1] && iso[2]) return validDateParts(iso[1], iso[2], iso[3])
+  const usFull = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (usFull?.[1] && usFull[2] && usFull[3]) return validDateParts(usFull[3], usFull[1], usFull[2])
+  const usMonth = raw.match(/^(\d{1,2})\/(\d{4})$/)
+  if (usMonth?.[1] && usMonth[2]) return validDateParts(usMonth[2], usMonth[1])
+  return null
+}
+
+function validDateParts(year: string, month: string, day?: string): DateParts | null {
+  const monthNumber = Number(month)
+  const dayNumber = day == null ? null : Number(day)
+  if (monthNumber < 1 || monthNumber > 12 || (dayNumber != null && (dayNumber < 1 || dayNumber > 31))) return null
+  return {
+    year,
+    month: String(monthNumber).padStart(2, '0'),
+    day: dayNumber == null ? null : String(dayNumber).padStart(2, '0'),
+  }
 }
 
 function parseRange(text: string): { min: number; max: number } | null {

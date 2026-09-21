@@ -1,0 +1,94 @@
+<main data-automation-id="jobApplication">
+  <section data-automation-id="workExperienceSection">
+    <article data-automation-id="workExperienceCard" aria-label="Work Experience 1">
+      <h3>Work Experience 1</h3>
+      <label for="job-1-from">From</label>
+      <input id="job-1-from" placeholder="MM/YYYY" />
+      <label for="job-1-to">To</label>
+      <input id="job-1-to" placeholder="MM/DD/YYYY" />
+      <label for="job-1-current">I currently work here</label>
+      <input id="job-1-current" type="checkbox" />
+    </article>
+
+    <article data-automation-id="workExperienceCard" aria-label="Work Experience 2">
+      <h3>Work Experience 2</h3>
+      <label for="job-2-from-month">From Month</label>
+      <select id="job-2-from-month">
+        <option value="">Select</option>
+        <option value="1">January</option>
+        <option value="6">June</option>
+      </select>
+      <label for="job-2-from-year">From Year</label>
+      <select id="job-2-from-year">
+        <option value="">Select</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+      </select>
+      <label for="job-2-to-month">To Month</label>
+      <select id="job-2-to-month">
+        <option value="">Select</option>
+        <option value="12">December</option>
+      </select>
+      <label for="job-2-to-year">To Year</label>
+      <select id="job-2-to-year">
+        <option value="">Select</option>
+        <option value="2026">2026</option>
+      </select>
+      <label for="job-2-current">Current Job</label>
+      <input id="job-2-current" type="checkbox" />
+    </article>
+  </section>
+
+  <section aria-label="Eligibility">
+    <fieldset>
+      <legend>Are you authorized to work in the United States?</legend>
+      <label><input id="auth-radio-yes" type="radio" name="auth-radio" value="yes" /> Yes</label>
+      <label><input id="auth-radio-no" type="radio" name="auth-radio" value="no" /> No</label>
+    </fieldset>
+    <label for="auth-select">Are you legally eligible to work in the United States?</label>
+    <select id="auth-select">
+      <option value="">Select</option>
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
+    <div class="question">
+      <span id="auth-combo-label">Do you have authorization to work in the United States?</span>
+      <input id="auth-combo" role="combobox" aria-labelledby="auth-combo-label" aria-controls="auth-options" aria-expanded="false" />
+    </div>
+    <div id="auth-options" role="listbox">
+      <div role="option">Yes</div>
+      <div role="option">No</div>
+    </div>
+  </section>
+
+  <section aria-label="Voluntary self-identification">
+    <label for="race">Race</label>
+    <select id="race">
+      <option value="">Select</option>
+      <option value="asian">Asian</option>
+      <option value="white">White</option>
+      <option value="decline">I do not wish to self-identify</option>
+    </select>
+    <label for="ethnicity">Are you Hispanic or Latino?</label>
+    <select id="ethnicity">
+      <option value="">Select</option>
+      <option value="hispanic">Hispanic or Latino</option>
+      <option value="not-hispanic">Not Hispanic or Latino</option>
+      <option value="decline">Prefer not to answer</option>
+    </select>
+    <label for="gender">Gender</label>
+    <select id="gender">
+      <option value="">Select</option>
+      <option value="female">Female</option>
+      <option value="male">Male</option>
+      <option value="decline">Prefer not to answer</option>
+    </select>
+    <label for="veteran">Veteran Status</label>
+    <select id="veteran">
+      <option value="">Select</option>
+      <option value="protected">I identify as a protected veteran</option>
+      <option value="not-protected">I am not a protected veteran</option>
+      <option value="decline">I do not wish to answer</option>
+    </select>
+  </section>
+</main>

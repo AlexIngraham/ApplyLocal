@@ -3,6 +3,7 @@ import { labelForControl } from '@/utils/dom'
 import { dispatchValueEvents, withSyntheticFill } from '@/utils/events'
 import { checkboxShouldBeChecked, matchChoice, parseMoney, toDate, toMonth } from '@/content/matchers'
 import type { Choice } from '@/content/matchers'
+import { dateCandidatesForControl } from '@/content/dateFormat'
 
 type Tracked = HTMLInputElement & { _valueTracker?: { setValue: (value: string) => void } }
 
@@ -50,7 +51,8 @@ function fillControlInner(field: DetectedField, value: string): FillResult {
     const select = control.elements[0]
     if (!(select instanceof HTMLSelectElement)) return { ok: false, status: 'failed', message: 'Missing select element.' }
     const options = Array.from(select.options).map((option) => ({ value: option.value, label: option.textContent || '' }))
-    const matched = matchChoice(options, value, field.canonical)
+    const candidates = dateCandidatesForControl(field, value) ?? [value]
+    const matched = candidates.map((candidate) => matchChoice(options, candidate, field.canonical)).find((item) => item != null) ?? null
     if (matched == null) return { ok: false, status: 'failed', message: 'No option matched the saved answer.' }
     setSelectValue(select, matched)
     return { ok: true, status: 'filled' }
@@ -93,7 +95,8 @@ function fillControlInner(field: DetectedField, value: string): FillResult {
   if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
     return { ok: false, status: 'failed', message: 'Missing text field.' }
   }
-  const formatted = formatForControl(value, control.inputType)
+  const dateCandidates = dateCandidatesForControl(field, value)
+  const formatted = dateCandidates == null ? formatForControl(value, control.inputType) : dateCandidates[0] ?? null
   if (formatted == null) return { ok: false, status: 'failed', message: 'Saved value does not fit this field.' }
   setNativeValue(el, formatted)
   return { ok: true, status: 'filled' }

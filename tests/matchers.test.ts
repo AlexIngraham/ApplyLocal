@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkboxShouldBeChecked, matchChoice, matchSalary, matchState, parseMoney, toMonth } from '@/content/matchers'
+import { checkboxShouldBeChecked, matchChoice, matchSalary, matchState, parseMoney, toDate, toMonth } from '@/content/matchers'
 import { setNativeValue } from '@/content/filler'
 
 describe('answer matching', () => {
@@ -44,7 +44,21 @@ describe('answer matching', () => {
 
   it('converts month values and refuses a bare year', () => {
     expect(toMonth('2020-05-01')).toBe('2020-05')
+    expect(toMonth('5/2020')).toBe('2020-05')
+    expect(toMonth('05/17/2020')).toBe('2020-05')
+    expect(toDate('05/17/2020')).toBe('2020-05-17')
     expect(toMonth('2020')).toBeNull()
+  })
+
+  it('uses exact matching for sensitive answers and only aliases explicit opt-outs', () => {
+    const race = [
+      { value: 'asian', label: 'Asian' },
+      { value: 'white', label: 'White' },
+      { value: 'decline', label: 'I do not wish to self-identify' },
+    ]
+    expect(matchChoice(race, 'Asian', 'sensitive.race')).toBe('asian')
+    expect(matchChoice(race, 'Asia', 'sensitive.race')).toBeNull()
+    expect(matchChoice(race, 'Prefer not to answer', 'sensitive.race')).toBe('decline')
   })
 })
 
