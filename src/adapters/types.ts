@@ -37,6 +37,8 @@ export interface FillResult {
   message?: string
 }
 
+export type FillOutcome = FillResult | Promise<FillResult>
+
 export interface ScanContext {
   url: string
   profile: Profile
@@ -49,7 +51,7 @@ export interface ATSAdapter {
   matches(url: string): boolean
   detectDom?(root: ParentNode): boolean
   scan(root: ParentNode, ctx: ScanContext): DetectedField[]
-  fill(field: DetectedField, value: string): FillResult
+  fill(field: DetectedField, value: string): FillOutcome
 }
 
 export interface AdapterHint {

@@ -30,8 +30,13 @@ function useful(text: string): string {
   return cleanText(text)
 }
 
-function controlKind(el: Element): { kind: ControlKind; inputType: string } | null {
+function controlKind(el: Element, adapterId: string): { kind: ControlKind; inputType: string } | null {
   if (inIgnoredRegion(el)) return null
+  if (el.getAttribute('role') === 'combobox') {
+    return adapterId === 'workday'
+      ? { kind: 'combobox', inputType: 'combobox' }
+      : { kind: 'custom', inputType: 'custom' }
+  }
   if (el instanceof HTMLTextAreaElement) return { kind: 'textarea', inputType: 'textarea' }
   if (el instanceof HTMLSelectElement) return { kind: 'select', inputType: 'select' }
   if (el instanceof HTMLInputElement) {
@@ -43,7 +48,6 @@ function controlKind(el: Element): { kind: ControlKind; inputType: string } | nu
     if (type === 'checkbox') return { kind: 'checkbox', inputType: 'checkbox' }
     return { kind: 'text', inputType: type }
   }
-  if (el.getAttribute('role') === 'combobox') return { kind: 'custom', inputType: 'custom' }
   return null
 }
 
@@ -75,10 +79,12 @@ function signalsFor(elements: HTMLElement[], kind: ControlKind): { signals: Text
   const id = el.getAttribute('id')
   const placeholder = el.getAttribute('placeholder')
   const autocomplete = el.getAttribute('autocomplete')
+  const automationId = el.getAttribute('data-automation-id')
   if (name) signals.push({ source: 'name', text: name })
   if (id) signals.push({ source: 'id', text: id })
   if (placeholder) signals.push({ source: 'placeholder', text: placeholder })
   if (autocomplete) signals.push({ source: 'autocomplete', text: autocomplete })
+  if (automationId) signals.push({ source: 'id', text: automationId })
   const aria = ariaText(el)
   if (aria) signals.push({ source: 'aria', text: aria })
 
@@ -110,13 +116,24 @@ export function scanControls(
   hintFor?: (el: Element) => AdapterHint | null,
 ): DetectedField[] {
   const seenRadios = new Set<HTMLInputElement>()
+  const seenControls = new Set<HTMLElement>()
   const repeats = new Map<CanonicalField, number>()
   const fields: DetectedField[] = []
   let seq = 0
 
   for (const el of collectElements(root)) {
-    const kind = controlKind(el)
+    if (el instanceof HTMLElement && seenControls.has(el)) continue
+    const kind = controlKind(el, adapterId)
     if (!kind || !(el instanceof HTMLElement)) continue
+    if (kind.kind === 'combobox') {
+      const nested = Array.from(el.querySelectorAll('input:not([type="hidden"]), textarea')).filter(
+        (item): item is HTMLElement => item instanceof HTMLElement,
+      )
+      nested.forEach((item) => seenControls.add(item))
+      const field = buildField([el, ...nested], kind.kind, kind.inputType)
+      if (field) fields.push(field)
+      continue
+    }
     if (el instanceof HTMLInputElement && kind.kind === 'radio') {
       if (seenRadios.has(el)) continue
       const group = radiosInGroup(el)

@@ -139,7 +139,9 @@ export function detectSection(el: Element): 'education' | 'employment' | 'unknow
       const kind = sectionFromText(legend?.textContent || '')
       if (kind !== 'unknown') return kind
     }
-    const classKind = sectionFromText(current.getAttribute('class') || '')
+    const classKind = sectionFromText(
+      `${current.getAttribute('class') || ''} ${current.getAttribute('data-automation-id') || ''}`,
+    )
     if (classKind !== 'unknown') return classKind
     let sibling = current.previousElementSibling
     while (sibling) {

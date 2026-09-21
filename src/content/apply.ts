@@ -1,7 +1,9 @@
-import type { DetectedField, FillResult } from '@/adapters/types'
-import { fillControl, isControlEmpty, readControl, restoreControl } from '@/content/filler'
+import type { DetectedField, FillOutcome, FillResult } from '@/adapters/types'
+import { isControlEmpty, readControl, restoreControl } from '@/content/filler'
+import { getAdapter } from '@/adapters/registry'
 
-export function applyDetectedFields(fields: DetectedField[], mode: 'auto' | 'page'): void {
+export function applyDetectedFields(fields: DetectedField[], mode: 'auto' | 'page'): Promise<void> {
+  const pending: Promise<FillResult>[] = []
   for (const field of fields) {
     if (field.locked || field.status === 'manual' || field.status === 'autofilled') continue
     if (mode === 'auto' && field.plan !== 'autofill') continue
@@ -13,11 +15,13 @@ export function applyDetectedFields(fields: DetectedField[], mode: 'auto' | 'pag
       field.planReason = 'Already had a value, so it was left unchanged.'
       continue
     }
-    writeField(field)
+    const result = writeField(field)
+    if (result instanceof Promise) pending.push(result)
   }
+  return Promise.all(pending).then(() => undefined)
 }
 
-export function fillOne(field: DetectedField): FillResult {
+export function fillOne(field: DetectedField): FillOutcome {
   if (field.fillBand === 'blocked' || field.fillBand === 'none' || !field.proposedValue) {
     return { ok: false, status: 'skipped', message: field.planReason }
   }
@@ -33,9 +37,16 @@ export function undoField(field: DetectedField): void {
   field.planReason = 'Reverted. Automatic fill will not replace this unless you press Fill.'
 }
 
-function writeField(field: DetectedField): FillResult {
+function writeField(field: DetectedField): FillOutcome {
   field.previousValue = readControl(field)
-  const result = fillControl(field, field.proposedValue ?? '')
+  const result = getAdapter(field.adapterId).fill(field, field.proposedValue ?? '')
+  if (result instanceof Promise) {
+    return result.then((settled) => updateResult(field, settled))
+  }
+  return updateResult(field, result)
+}
+
+function updateResult(field: DetectedField, result: FillResult): FillResult {
   if (result.ok) {
     field.status = 'autofilled'
     field.fillError = undefined

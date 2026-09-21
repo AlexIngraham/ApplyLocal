@@ -1,0 +1,29 @@
+<main data-automation-id="applicationPage">
+  <form data-automation-id="jobApplication">
+    <div data-automation-id="formField-country">
+      <label id="country-label" for="wd-country">Country</label>
+      <input id="wd-country" data-automation-id="country" role="combobox" aria-labelledby="country-label" aria-controls="country-list" aria-expanded="false" />
+    </div>
+    <div data-automation-id="formField-region">
+      <label id="state-label" for="wd-state">State</label>
+      <input id="wd-state" data-automation-id="region" role="combobox" aria-labelledby="state-label" aria-controls="state-list" aria-expanded="false" />
+    </div>
+    <div data-automation-id="formField-degree">
+      <label id="degree-label" for="wd-degree-combo">Degree</label>
+      <button id="wd-degree-combo" type="button" data-automation-id="degree" role="combobox" aria-labelledby="degree-label" aria-controls="degree-list" aria-expanded="false"></button>
+    </div>
+    <div id="country-list" role="listbox">
+      <div role="option" data-automation-id="promptOption">Canada</div>
+      <div role="option" data-automation-id="promptOption">United States of America</div>
+    </div>
+    <div id="state-list" role="listbox">
+      <div role="option" data-automation-id="promptOption">California</div>
+      <div role="option" data-automation-id="promptOption">Texas</div>
+      <div role="option" data-automation-id="promptOption">Pennsylvania</div>
+    </div>
+    <div id="degree-list" role="listbox">
+      <div role="option" data-automation-id="promptOption">B.S.</div>
+      <div role="option" data-automation-id="promptOption">M.S.</div>
+    </div>
+  </form>
+</main>

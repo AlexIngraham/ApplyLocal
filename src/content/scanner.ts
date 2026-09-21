@@ -10,8 +10,9 @@ export interface ScanResult {
 }
 
 export function scanDocument(root: ParentNode, ctx: ScanContext): ScanResult {
-  const adapter = selectAdapter(ctx.url, root, ctx.settings)
-  const ats = adapter.id === 'greenhouse' || adapter.id === 'lever' ? adapter.id : 'generic'
+  const detectionRoot = root instanceof Node ? root.ownerDocument ?? root : root
+  const adapter = selectAdapter(ctx.url, detectionRoot, ctx.settings)
+  const ats = adapter.id === 'greenhouse' || adapter.id === 'lever' || adapter.id === 'workday' ? adapter.id : 'generic'
   return {
     ats,
     atsLabel: ATS_LABELS[ats] || adapter.label,

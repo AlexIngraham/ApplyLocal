@@ -28,11 +28,13 @@ export function startController(doc: Document, win: Window): void {
   let settings: Settings | null = null
   let fields: DetectedField[] = []
   const byElement = new WeakMap<HTMLElement, DetectedField>()
+  const manuallyEdited = new Set<string>()
+  let fieldSequence = 0
   let overlay: Overlay | null = null
   let stopObserver: (() => void) | null = null
   let ats: AtsId = 'generic'
   let started = false
-  const url = win.location.href
+  const currentUrl = () => win.location.href
 
   const ready = (async () => {
     profile = await loadProfile()
@@ -68,7 +70,7 @@ export function startController(doc: Document, win: Window): void {
 
   function hello() {
     try {
-      chrome.runtime.sendMessage({ type: 'al:hello', href: url }, () => {
+      chrome.runtime.sendMessage({ type: 'al:hello', href: currentUrl() }, () => {
       void chrome.runtime.lastError
     })
     } catch {
@@ -83,8 +85,9 @@ export function startController(doc: Document, win: Window): void {
       onFill: (id) => {
         const field = fields.find((item) => item.id === id)
         if (!field) return
-        fillOne(field)
-        paint()
+        const result = fillOne(field)
+        if (result instanceof Promise) void result.then(paint)
+        else paint()
       },
       onUndo: (id) => {
         const field = fields.find((item) => item.id === id)
@@ -97,11 +100,11 @@ export function startController(doc: Document, win: Window): void {
       },
     })
     rescan(doc)
-    if (settings.autoFillHighConfidence) applyDetectedFields(fields, 'auto')
+    if (settings.autoFillHighConfidence) void applyDetectedFields(fields, 'auto').then(paint)
     paint()
     stopObserver = observeAdditions(doc, (nodes) => {
       for (const node of nodes) rescan(node)
-      if (settings?.autoFillHighConfidence) applyDetectedFields(fields, 'auto')
+      if (settings?.autoFillHighConfidence) void applyDetectedFields(fields, 'auto').then(paint)
       paint()
     })
     maybeOfferToSave()
@@ -119,23 +122,29 @@ export function startController(doc: Document, win: Window): void {
 
   function refresh() {
     rescan(doc)
-    if (settings?.autoFillHighConfidence) applyDetectedFields(fields, 'auto')
+    if (settings?.autoFillHighConfidence) void applyDetectedFields(fields, 'auto').then(paint)
     paint()
   }
 
   function rescan(root: ParentNode) {
     if (!profile || !settings) return
     if (root === doc) {
-      const adapter = selectAdapter(url, doc, settings)
-      ats = adapter.id === 'greenhouse' || adapter.id === 'lever' ? adapter.id : 'generic'
+      const adapter = selectAdapter(currentUrl(), doc, settings)
+      ats = adapter.id === 'greenhouse' || adapter.id === 'lever' || adapter.id === 'workday' ? adapter.id : 'generic'
     }
-    const result = scanDocument(root, { url, profile, settings })
+    const result = scanDocument(root, { url: currentUrl(), profile, settings })
     merge(result.fields)
   }
 
   function merge(detected: DetectedField[]) {
     for (const field of detected) {
-      const existing = field.control.elements.map((el) => byElement.get(el)).find((item) => item !== undefined)
+      let existing = field.control.elements.map((el) => byElement.get(el)).find((item) => item !== undefined)
+      if (!existing) {
+        const key = fieldKey(field)
+        existing = fields.find(
+          (item) => fieldKey(item) === key && !item.control.elements.some((element) => element.isConnected),
+        )
+      }
       if (existing) {
         existing.canonical = field.canonical
         existing.confidence = field.confidence
@@ -152,6 +161,12 @@ export function startController(doc: Document, win: Window): void {
         for (const el of field.control.elements) byElement.set(el, existing)
         if (!existing.locked && existing.status !== 'autofilled' && existing.status !== 'manual') existing.status = field.status
         continue
+      }
+      field.id = `f${++fieldSequence}`
+      if (manuallyEdited.has(fieldKey(field))) {
+        field.locked = true
+        field.status = 'manual'
+        field.planReason = 'You edited this field, so ApplyLocal will leave it alone.'
       }
       fields.push(field)
       for (const el of field.control.elements) byElement.set(el, field)
@@ -180,6 +195,7 @@ export function startController(doc: Document, win: Window): void {
     field.locked = true
     field.status = 'manual'
     field.planReason = 'You edited this field, so ApplyLocal will leave it alone.'
+    manuallyEdited.add(fieldKey(field))
     paint()
   }
 
@@ -192,16 +208,16 @@ export function startController(doc: Document, win: Window): void {
   }
 
   function maybeOfferToSave() {
-    const signals = readSuccessSignals(doc, url)
+    const signals = readSuccessSignals(doc, currentUrl())
     if (!detectSuccess(signals)) return
     const h1 = doc.querySelector('h1')?.textContent || ''
-    showSuccessBanner(doc, successDraftFrom(url, h1), async (draft) => {
+    showSuccessBanner(doc, successDraftFrom(currentUrl(), h1), async (draft) => {
       try {
         await addApplication({
           id: createId('app'),
           company: draft.company,
           jobTitle: draft.jobTitle,
-          url,
+          url: currentUrl(),
           ats: ATS_LABELS[ats],
           dateApplied: new Date().toISOString(),
           status: 'applied',
@@ -223,7 +239,7 @@ export function startController(doc: Document, win: Window): void {
     if (!started) activate()
     if (message.type === 'al:scan') refresh()
     if (message.type === 'al:autofill') {
-      applyDetectedFields(fields, 'page')
+      await applyDetectedFields(fields, 'page')
       paint()
     }
     return snapshot()
@@ -231,7 +247,7 @@ export function startController(doc: Document, win: Window): void {
 
   function snapshot(): ScanSnapshot {
     return summarize(fields, {
-      href: url,
+      href: currentUrl(),
       ats,
       atsLabel: ATS_LABELS[ats],
       enabled: settings?.enabled ?? false,
@@ -255,5 +271,16 @@ export function startController(doc: Document, win: Window): void {
       fillError: field.fillError,
       anchor,
     }
+  }
+
+  function fieldKey(field: DetectedField): string {
+    const el = field.control.elements[0]
+    const identity =
+      el?.getAttribute('data-automation-id') ||
+      el?.getAttribute('name') ||
+      el?.getAttribute('id') ||
+      el?.getAttribute('aria-label') ||
+      field.label
+    return `${field.adapterId}|${field.canonical}|${identity}|${field.repeatIndex}`
   }
 }

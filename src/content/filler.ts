@@ -43,7 +43,7 @@ export function fillControl(field: DetectedField, value: string): FillResult {
 
 function fillControlInner(field: DetectedField, value: string): FillResult {
   const { control } = field
-  if (control.kind === 'file' || control.kind === 'custom') {
+  if (control.kind === 'file' || control.kind === 'custom' || control.kind === 'combobox') {
     return { ok: false, status: 'skipped', message: 'This control is left for you to complete.' }
   }
   if (control.kind === 'select') {
@@ -109,6 +109,10 @@ export function readControl(field: DetectedField): string {
     return checked?.value ?? ''
   }
   const el = field.control.elements[0]
+  if (field.control.kind === 'combobox' && el) {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value
+    return el.getAttribute('data-value') || el.getAttribute('aria-valuetext') || el.textContent?.trim() || ''
+  }
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return el.value
   return ''
 }
@@ -129,6 +133,9 @@ export function isControlEmpty(field: DetectedField): boolean {
   }
   if (field.control.kind === 'checkbox') {
     return !(el instanceof HTMLInputElement && el.checked)
+  }
+  if (field.control.kind === 'combobox') {
+    return readControl(field).trim() === ''
   }
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value.trim() === ''
   return true

@@ -115,11 +115,13 @@ function send(tabId: number, frameId: number | undefined, message: ContentReques
 }
 
 function combine(snapshots: ScanSnapshot[], url: string): Pick<PageState, 'ats' | 'atsLabel' | 'snapshot'> {
-  const ats = snapshots.some((item) => item.ats === 'greenhouse')
-    ? 'greenhouse'
-    : snapshots.some((item) => item.ats === 'lever')
-      ? 'lever'
-      : detectAtsFromUrl(url)
+  const ats = snapshots.some((item) => item.ats === 'workday')
+    ? 'workday'
+    : snapshots.some((item) => item.ats === 'greenhouse')
+      ? 'greenhouse'
+      : snapshots.some((item) => item.ats === 'lever')
+        ? 'lever'
+        : detectAtsFromUrl(url)
   const fields = snapshots.flatMap((item, index) =>
     item.fields.map((field) => ({ ...field, id: `${index}-${field.id}` })),
   )

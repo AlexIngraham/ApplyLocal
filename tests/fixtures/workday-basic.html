@@ -1,0 +1,69 @@
+<main data-automation-id="applicationPage">
+  <h1>Apply for Software Engineer</h1>
+  <form data-automation-id="jobApplication">
+    <section data-automation-id="legalNameSection">
+      <h2>Personal Information</h2>
+      <div data-automation-id="formField-firstName">
+        <label for="wd-first">First Name</label>
+        <input id="wd-first" data-automation-id="legalNameSection_firstName" autocomplete="given-name" />
+      </div>
+      <div data-automation-id="formField-lastName">
+        <label for="wd-last">Last Name</label>
+        <input id="wd-last" data-automation-id="legalNameSection_lastName" autocomplete="family-name" />
+      </div>
+      <label for="wd-email">Email Address</label>
+      <input id="wd-email" data-automation-id="emailAddress" type="email" />
+      <label for="wd-phone">Phone Number</label>
+      <input id="wd-phone" data-automation-id="phoneNumber" type="tel" />
+      <label for="wd-address">Address Line 1</label>
+      <input id="wd-address" data-automation-id="addressSection_addressLine1" />
+      <label for="wd-city">City</label>
+      <input id="wd-city" data-automation-id="addressSection_city" />
+      <label for="wd-zip">Postal Code</label>
+      <input id="wd-zip" data-automation-id="addressSection_postalCode" />
+    </section>
+
+    <section data-automation-id="educationSection">
+      <h2>Education</h2>
+      <label for="wd-school">School</label>
+      <input id="wd-school" data-automation-id="school" />
+      <label for="wd-degree">Degree</label>
+      <input id="wd-degree" data-automation-id="degree" />
+      <label for="wd-major">Field of Study</label>
+      <input id="wd-major" data-automation-id="fieldOfStudy" />
+      <label for="wd-grad">Graduation Date</label>
+      <input id="wd-grad" data-automation-id="graduationDate" type="month" />
+    </section>
+
+    <section data-automation-id="workExperienceSection">
+      <h2>Work Experience</h2>
+      <label for="wd-company">Company</label>
+      <input id="wd-company" data-automation-id="company" />
+      <label for="wd-title">Job Title</label>
+      <input id="wd-title" data-automation-id="jobTitle" />
+      <label for="wd-job-start">Start Date</label>
+      <input id="wd-job-start" data-automation-id="startDate" type="month" />
+    </section>
+
+    <fieldset data-automation-id="workAuthorizationQuestion">
+      <legend>Are you legally authorized to work in the United States?</legend>
+      <label><input id="wd-auth-yes" name="wd-auth" type="radio" value="yes" /> Yes</label>
+      <label><input name="wd-auth" type="radio" value="no" /> No</label>
+    </fieldset>
+    <fieldset data-automation-id="futureSponsorshipQuestion">
+      <legend>Will you now or in the future require employer sponsorship?</legend>
+      <label><input id="wd-sponsor-yes" name="wd-sponsor" type="radio" value="yes" /> Yes</label>
+      <label><input id="wd-sponsor-no" name="wd-sponsor" type="radio" value="no" /> No</label>
+    </fieldset>
+    <div data-automation-id="formField-gender">
+      <label for="wd-gender">Gender</label>
+      <select id="wd-gender">
+        <option value="">Select</option>
+        <option value="female">Female</option>
+        <option value="male">Male</option>
+        <option value="decline">Decline to self-identify</option>
+      </select>
+    </div>
+    <button type="button" data-automation-id="bottom-navigation-next-button">Save and Continue</button>
+  </form>
+</main>
