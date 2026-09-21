@@ -154,6 +154,7 @@ export function startController(doc: Document, win: Window): void {
         existing.fillBand = field.fillBand
         existing.label = field.label
         existing.repeatIndex = field.repeatIndex
+        existing.repeatedSection = field.repeatedSection
         existing.sensitive = field.sensitive
         existing.adapterId = field.adapterId
         existing.control = field.control
@@ -264,9 +265,11 @@ export function startController(doc: Document, win: Window): void {
       confidence: field.confidence,
       reason: field.reason,
       planReason: field.planReason,
-      proposedValue: field.sensitive && field.fillBand === 'blocked' ? null : field.proposedValue,
+      proposedValue: field.sensitive && field.fillBand === 'blocked' ? null : displayValue(field.proposedValue),
       label: field.label,
-      canFill: (field.fillBand === 'high' || field.fillBand === 'review') && Boolean(field.proposedValue),
+      canFill:
+        (field.fillBand === 'high' || field.fillBand === 'review') &&
+        (Array.isArray(field.proposedValue) ? field.proposedValue.length > 0 : Boolean(field.proposedValue)),
       canUndo: field.previousValue != null,
       fillError: field.fillError,
       anchor,
@@ -281,6 +284,12 @@ export function startController(doc: Document, win: Window): void {
       el?.getAttribute('id') ||
       el?.getAttribute('aria-label') ||
       field.label
-    return `${field.adapterId}|${field.canonical}|${identity}|${field.repeatIndex}`
+    const section = field.repeatedSection?.sectionKey ?? field.repeatIndex
+    return `${field.adapterId}|${field.canonical}|${identity}|${section}`
+  }
+
+  function displayValue(value: DetectedField['proposedValue']): string | null {
+    if (!value) return null
+    return Array.isArray(value) ? value.join(', ') : value
   }
 }

@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { selectAdapter } from '@/adapters/registry'
-import { fillWorkdayCombobox, matchWorkdayOption } from '@/adapters/workdayDom'
+import {
+  fillWorkdayCombobox,
+  fillWorkdayMultiValueCombobox,
+  matchWorkdayOption,
+  matchWorkdaySkillOption,
+} from '@/adapters/workdayDom'
 import { applyDetectedFields, fillOne } from '@/content/apply'
 import { observeAdditions } from '@/content/mutationObserver'
 import { scanDocument } from '@/content/scanner'
@@ -166,5 +171,249 @@ describe('Workday multi-step changes', () => {
     expect(result.ats).toBe('workday')
     expect(fieldById(result.fields, 'step-school')?.canonical).toBe('school')
     expect(fieldById(result.fields, 'step-major')?.canonical).toBe('major')
+  })
+})
+
+describe('Workday repeated sections', () => {
+  it('maps every employment and education field by its containing card', async () => {
+    renderFixture('workday-repeated-sections.html')
+    const profile = testProfile()
+    profile.employment = [
+      {
+        id: 'job-alpha',
+        company: 'Company Alpha',
+        jobTitle: 'Software Engineer Intern',
+        startDate: '2023-05',
+        endDate: '2023-08',
+        current: false,
+        location: 'New York, NY',
+        description: '',
+      },
+      {
+        id: 'job-beta',
+        company: 'Company Beta',
+        jobTitle: 'Data Analyst Intern',
+        startDate: '2024-01',
+        endDate: '2024-06',
+        current: false,
+        location: 'Philadelphia, PA',
+        description: '',
+      },
+    ]
+    profile.education = [
+      {
+        id: 'edu-alpha',
+        school: 'Alpha University',
+        degree: 'B.S.',
+        major: 'Computer Science',
+        minor: '',
+        startDate: '2018-08',
+        graduationDate: '2022-05',
+        gpa: '',
+      },
+      {
+        id: 'edu-beta',
+        school: 'Beta College',
+        degree: 'M.S.',
+        major: 'Data Science',
+        minor: '',
+        startDate: '2022-08',
+        graduationDate: '2024-05',
+        gpa: '',
+      },
+    ]
+    const result = scanDocument(document, {
+      url: 'https://acme.myworkdayjobs.com/job/1',
+      profile,
+      settings: testSettings(),
+    })
+    const expected: Record<string, string> = {
+      'job-1-company': 'Company Alpha',
+      'job-1-title': 'Software Engineer Intern',
+      'job-1-start': '2023-05',
+      'job-1-end': '2023-08',
+      'job-1-location': 'New York, NY',
+      'job-2-company': 'Company Beta',
+      'job-2-title': 'Data Analyst Intern',
+      'job-2-start': '2024-01',
+      'job-2-end': '2024-06',
+      'job-2-location': 'Philadelphia, PA',
+      'edu-1-school': 'Alpha University',
+      'edu-1-degree': 'B.S.',
+      'edu-1-major': 'Computer Science',
+      'edu-1-start': '2018-08',
+      'edu-1-end': '2022-05',
+      'edu-2-school': 'Beta College',
+      'edu-2-degree': 'M.S.',
+      'edu-2-major': 'Data Science',
+      'edu-2-start': '2022-08',
+      'edu-2-end': '2024-05',
+    }
+    for (const [id, value] of Object.entries(expected)) {
+      expect(fieldById(result.fields, id)?.proposedValue, id).toBe(value)
+    }
+    for (const id of Object.keys(expected).filter((id) => id.startsWith('job-1'))) {
+      expect(fieldById(result.fields, id)?.repeatedSection).toMatchObject({ kind: 'employment', sectionIndex: 0 })
+    }
+    for (const id of Object.keys(expected).filter((id) => id.startsWith('job-2'))) {
+      expect(fieldById(result.fields, id)?.repeatedSection).toMatchObject({ kind: 'employment', sectionIndex: 1 })
+    }
+    for (const id of Object.keys(expected).filter((id) => id.startsWith('edu-1'))) {
+      expect(fieldById(result.fields, id)?.repeatedSection).toMatchObject({ kind: 'education', sectionIndex: 0 })
+    }
+    for (const id of Object.keys(expected).filter((id) => id.startsWith('edu-2'))) {
+      expect(fieldById(result.fields, id)?.repeatedSection).toMatchObject({ kind: 'education', sectionIndex: 1 })
+    }
+    const firstJobKeys = Object.keys(expected)
+      .filter((id) => id.startsWith('job-1'))
+      .map((id) => fieldById(result.fields, id)?.repeatedSection?.sectionKey)
+    const secondJobKeys = Object.keys(expected)
+      .filter((id) => id.startsWith('job-2'))
+      .map((id) => fieldById(result.fields, id)?.repeatedSection?.sectionKey)
+    expect(new Set(firstJobKeys).size).toBe(1)
+    expect(new Set(secondJobKeys).size).toBe(1)
+    expect(firstJobKeys[0]).not.toBe(secondJobKeys[0])
+    await applyDetectedFields(result.fields, 'auto')
+    for (const [id, value] of Object.entries(expected)) {
+      expect((document.getElementById(id) as HTMLInputElement).value, id).toBe(value)
+    }
+  })
+
+  it('indexes a newly inserted Workday card from the full document order during a mutation rescan', async () => {
+    renderFixture('workday-repeated-sections.html')
+    const profile = testProfile()
+    profile.employment = [
+      profile.employment[0]!,
+      { ...profile.employment[0]!, id: 'job-second' },
+      {
+        id: 'job-gamma',
+        company: 'Company Gamma',
+        jobTitle: 'Research Intern',
+        startDate: '',
+        endDate: '',
+        current: false,
+        location: '',
+        description: '',
+      },
+    ]
+    const rescans: Array<ReturnType<typeof scanDocument>> = []
+    const stop = observeAdditions(document, (nodes) => {
+      const node = nodes[0]
+      if (node) {
+        rescans.push(
+          scanDocument(node, {
+            url: 'https://acme.myworkdayjobs.com/job/1',
+            profile,
+            settings: testSettings(),
+          }),
+        )
+      }
+    })
+    const card = document.createElement('article')
+    card.setAttribute('data-automation-id', 'workExperienceCard')
+    card.setAttribute('aria-label', 'Work Experience 3')
+    card.innerHTML = '<label for="job-3-company">Company</label><input id="job-3-company" data-automation-id="company">'
+    document.querySelector('[data-automation-id="workExperienceSection"]')?.append(card)
+    await new Promise((resolve) => window.setTimeout(resolve, 240))
+    stop()
+    const company = rescans[0] ? fieldById(rescans[0].fields, 'job-3-company') : undefined
+    expect(company?.repeatedSection).toMatchObject({ kind: 'employment', sectionIndex: 2 })
+    expect(company?.proposedValue).toBe('Company Gamma')
+  })
+})
+
+describe('Workday multi-value skills', () => {
+  it('adds skills individually, skips duplicates and missing exact matches, and reports partial results', async () => {
+    renderFixture('workday-skills.html')
+    const profile = testProfile()
+    profile.skills = ['TypeScript', 'React', 'Rust', 'Python']
+    const result = scanDocument(document, {
+      url: 'https://acme.myworkdayjobs.com/job/1',
+      profile,
+      settings: testSettings(),
+    })
+    const field = fieldById(result.fields, 'workday-skills')
+    expect(field).toMatchObject({ canonical: 'skills', proposedValue: profile.skills })
+    expect(field?.control.multiValue).toBe(true)
+    if (!field) throw new Error('missing Workday skills field')
+
+    const typed: string[] = []
+    const input = document.getElementById('workday-skills') as HTMLInputElement
+    input.addEventListener('input', () => typed.push(input.value))
+    const selected = document.querySelector('[data-automation-id="selectedSkills"]') as HTMLElement
+    document.querySelectorAll<HTMLElement>('#skills-list [role="option"]').forEach((option) => {
+      option.addEventListener('click', () => {
+        const chip = document.createElement('span')
+        chip.setAttribute('data-automation-id', 'skillChip')
+        chip.setAttribute('role', 'listitem')
+        chip.textContent = option.textContent
+        selected.append(chip)
+        input.value = ''
+      })
+    })
+
+    const outcome = await fillOne(field)
+    expect(outcome).toMatchObject({ ok: true, requested: 4, filled: 2, skipped: 2 })
+    expect(field).toMatchObject({ status: 'suggested', locked: true })
+    const chips = Array.from(selected.querySelectorAll('[role="listitem"]')).map((chip) => chip.textContent?.trim())
+    expect(chips).toEqual(['React', 'TypeScript', 'Python'])
+    expect(chips.filter((skill) => skill === 'React')).toHaveLength(1)
+    expect(typed).not.toContain('React')
+    expect(typed.every((value) => !value.includes(','))).toBe(true)
+  })
+
+  it('uses punctuation-safe exact matching for short language names', () => {
+    expect(matchWorkdaySkillOption(['C++', 'C#'], 'C')).toBeNull()
+    expect(matchWorkdaySkillOption(['C', 'C++', 'C#'], ' c ')).toBe(0)
+  })
+
+  it('stops safely when the widget refuses another skill', async () => {
+    const { fields } = scanFixture('workday-skills.html', 'https://acme.myworkdayjobs.com/job/1')
+    const field = fieldById(fields, 'workday-skills')
+    if (!field) throw new Error('missing Workday skills field')
+    const input = document.getElementById('workday-skills') as HTMLInputElement
+    const typed: string[] = []
+    input.addEventListener('input', () => typed.push(input.value))
+    const selected = document.querySelector('[data-automation-id="selectedSkills"]') as HTMLElement
+    const typeScript = Array.from(document.querySelectorAll<HTMLElement>('#skills-list [role="option"]')).find(
+      (option) => option.textContent === 'TypeScript',
+    )
+    typeScript?.addEventListener('click', () => {
+      const chip = document.createElement('span')
+      chip.setAttribute('data-automation-id', 'skillChip')
+      chip.setAttribute('role', 'listitem')
+      chip.textContent = 'TypeScript'
+      selected.append(chip)
+      input.value = ''
+    })
+
+    const outcome = await fillWorkdayMultiValueCombobox(field, ['TypeScript', 'Python', 'C#'], 40)
+    expect(outcome).toMatchObject({ ok: true, requested: 3, filled: 1, skipped: 2, needsReview: true })
+    expect(typed).toContain('TypeScript')
+    expect(typed).toContain('Python')
+    expect(typed).not.toContain('C#')
+  })
+
+  it('keeps comma-separated filling for an ordinary skills textarea', async () => {
+    document.body.innerHTML = `
+      <main data-automation-id="applicationPage">
+        <form data-automation-id="jobApplication">
+          <label for="plain-skills">List your technical skills</label>
+          <textarea id="plain-skills"></textarea>
+        </form>
+      </main>
+    `
+    const profile = testProfile()
+    profile.skills = ['TypeScript', 'React', 'Python']
+    const result = scanDocument(document, {
+      url: 'https://acme.myworkdayjobs.com/job/1',
+      profile,
+      settings: testSettings(),
+    })
+    const field = fieldById(result.fields, 'plain-skills')
+    expect(field?.proposedValue).toEqual(profile.skills)
+    expect(field?.control.multiValue).not.toBe(true)
+    await applyDetectedFields(result.fields, 'auto')
+    expect((document.getElementById('plain-skills') as HTMLTextAreaElement).value).toBe('TypeScript, React, Python')
   })
 })

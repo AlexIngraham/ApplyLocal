@@ -5,7 +5,7 @@ import { decideFieldPlan } from '@/classifier/confidence'
 import type { ControlKind } from '@/classifier/confidence'
 import { EDUCATION_FIELDS, EMPLOYMENT_FIELDS } from '@/profile/types'
 import { proposedValue, sensitiveBlocked } from '@/profile/resolve'
-import type { AdapterHint, DetectedField, ScanContext } from '@/adapters/types'
+import type { AdapterHint, DetectedField, RepeatedSectionContext, ScanContext } from '@/adapters/types'
 import { normalize } from '@/classifier/normalize'
 import {
   ariaText,
@@ -114,6 +114,7 @@ export function scanControls(
   ctx: ScanContext,
   adapterId: string,
   hintFor?: (el: Element) => AdapterHint | null,
+  repeatedSectionFor?: (el: HTMLElement) => RepeatedSectionContext | null,
 ): DetectedField[] {
   const seenRadios = new Set<HTMLInputElement>()
   const seenControls = new Set<HTMLElement>()
@@ -161,8 +162,10 @@ export function scanControls(
       section,
       adapterHint: hintFor?.(primary) ?? null,
     })
-    const repeatIndex = REPEATING.has(classification.key) ? nextRepeat(classification.key) : 0
-    const value = proposedValue(ctx.profile, ctx.settings, classification.key, repeatIndex)
+    const detectedSection = REPEATING.has(classification.key) ? repeatedSectionFor?.(primary) ?? null : null
+    const repeatedSection = sectionMatchesField(detectedSection, classification.key) ? detectedSection ?? undefined : undefined
+    const repeatIndex = repeatedSection?.sectionIndex ?? (REPEATING.has(classification.key) ? nextRepeat(classification.key) : 0)
+    const value = proposedValue(ctx.profile, ctx.settings, classification.key, repeatIndex, repeatedSection)
     const decision = decideFieldPlan({
       key: classification.key,
       confidence: classification.confidence,
@@ -186,12 +189,19 @@ export function scanControls(
       planReason: decision.planReason,
       label: extracted.label || classification.key,
       repeatIndex,
+      repeatedSection,
       status: decision.plan === 'review' ? 'suggested' : decision.plan === 'skip' ? 'skipped' : 'untouched',
       sensitive: classification.sensitive,
       locked: false,
       control: { elements, kind, inputType },
       previousValue: null,
     }
+  }
+
+  function sectionMatchesField(section: RepeatedSectionContext | null, key: CanonicalField): boolean {
+    if (!section) return false
+    if (section.kind === 'education') return EDUCATION_FIELDS.includes(key as (typeof EDUCATION_FIELDS)[number])
+    return EMPLOYMENT_FIELDS.includes(key as (typeof EMPLOYMENT_FIELDS)[number])
   }
 
   function nextRepeat(key: CanonicalField): number {

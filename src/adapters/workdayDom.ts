@@ -1,8 +1,8 @@
-import type { AdapterHint, DetectedField, FillResult } from '@/adapters/types'
+import type { AdapterHint, DetectedField, FillResult, RepeatedSectionMatch } from '@/adapters/types'
 import type { CanonicalField } from '@/classifier/types'
 import { normalize } from '@/classifier/normalize'
 import { matchChoice } from '@/content/matchers'
-import { cleanText, cssEscape } from '@/utils/dom'
+import { ariaText, cleanText, cssEscape, labelForControl } from '@/utils/dom'
 import { withSyntheticFill } from '@/utils/events'
 import { devLog } from '@/utils/logging'
 
@@ -33,6 +33,7 @@ const HINTS: Array<[RegExp, AdapterHint]> = [
   [/\blinked ?in\b/, hint('linkedin', 'Workday LinkedIn field')],
   [/\bgithub\b/, hint('github', 'Workday GitHub field')],
   [/\b(portfolio|website)\b/, hint('portfolio', 'Workday portfolio field')],
+  [/\b(technical skills|skill input|skills)\b/, hint('skills', 'Workday skills field')],
 ]
 
 function hint(key: CanonicalField, reason: string): AdapterHint {
@@ -56,13 +57,116 @@ export function workdayHintFor(el: Element): AdapterHint | null {
     el.getAttribute('name'),
     el.getAttribute('id'),
     el.getAttribute('aria-label'),
+    ariaText(el),
+    labelForControl(el),
     el.closest('[data-automation-id]')?.getAttribute('data-automation-id'),
   ]
   const text = normalize(pieces.filter(Boolean).join(' '))
+  const repeated =
+    el instanceof HTMLElement && /\b(location|start date|startdate|end date|enddate)\b/.test(text)
+      ? findWorkdayRepeatedSection(el)
+      : null
+  if (repeated?.kind === 'employment') {
+    if (/\b(work |job |employment )?location\b/.test(text)) return hint('employmentLocation', 'Location in a Workday experience card')
+    if (/\b(start date|startdate)\b/.test(text)) return hint('employmentStart', 'Start date in a Workday experience card')
+    if (/\b(end date|enddate)\b/.test(text)) return hint('employmentEnd', 'End date in a Workday experience card')
+  }
+  if (repeated?.kind === 'education') {
+    if (/\b(start date|startdate)\b/.test(text)) return hint('educationStart', 'Start date in a Workday education card')
+    if (/\b(end date|enddate)\b/.test(text)) return hint('graduationDate', 'End date in a Workday education card')
+  }
   for (const [pattern, value] of HINTS) {
     if (pattern.test(text)) return value
   }
   return null
+}
+
+export function findWorkdayRepeatedSection(el: HTMLElement): RepeatedSectionMatch | null {
+  const doc = el.ownerDocument
+  for (const kind of ['employment', 'education'] as const) {
+    const containers = repeatedContainers(doc, kind)
+    const container = containers.find((candidate) => candidate.contains(el))
+    if (!container) continue
+    const sectionIndex = containers.indexOf(container)
+    return {
+      kind,
+      container,
+      sectionIndex,
+      sectionKey: sectionKey(container, kind, sectionIndex, containers),
+    }
+  }
+  return null
+}
+
+function repeatedContainers(doc: Document, kind: 'employment' | 'education'): HTMLElement[] {
+  const possible = Array.from(
+    doc.querySelectorAll('[data-automation-id], section, article, fieldset, [role="group"], [role="region"]'),
+  ).filter((candidate): candidate is HTMLElement => candidate instanceof HTMLElement && repeatedContainerKind(candidate) === kind)
+  return possible.filter(
+    (candidate) => !possible.some((other) => other !== candidate && candidate.contains(other)),
+  )
+}
+
+function repeatedContainerKind(el: HTMLElement): 'employment' | 'education' | null {
+  const automation = normalize(el.getAttribute('data-automation-id') || '')
+  const identity = normalize(`${el.id} ${el.getAttribute('aria-label') || ''} ${ariaText(el)} ${directHeading(el)}`)
+  const marker = `${automation} ${identity}`.trim()
+  const kind = kindFromText(marker)
+  if (!kind) return null
+
+  const role = el.getAttribute('role')
+  const semanticRole = role === 'group' || role === 'region'
+  const semanticTag = el.tagName === 'ARTICLE' || el.tagName === 'FIELDSET'
+  const entryMarker = /\b(card|entry|item|record|panel|detail)\b|\b\d+\b/.test(marker)
+  const exactMarker = /^(work experience|employment|education)$/.test(automation)
+  const outerMarker = /\b(section|page|list|container)\b/.test(automation)
+  if (outerMarker && !entryMarker && !semanticRole && !semanticTag) return null
+  return entryMarker || exactMarker || semanticRole || semanticTag ? kind : null
+}
+
+function kindFromText(text: string): 'employment' | 'education' | null {
+  if (/\b(work experience|employment|job history|professional experience)\b/.test(text)) return 'employment'
+  if (/\b(education|academic history)\b/.test(text)) return 'education'
+  return null
+}
+
+function directHeading(el: HTMLElement): string {
+  for (const child of Array.from(el.children)) {
+    if (/^H[1-6]$/.test(child.tagName) || child.tagName === 'LEGEND') return cleanText(child.textContent)
+  }
+  return ''
+}
+
+function sectionKey(
+  container: HTMLElement,
+  kind: 'employment' | 'education',
+  index: number,
+  peers: HTMLElement[],
+): string {
+  const attributes = ['data-instance-id', 'id', 'aria-label', 'data-automation-id'] as const
+  for (const attribute of attributes) {
+    const value = attribute === 'id' ? container.id : container.getAttribute(attribute) || ''
+    if (!value) continue
+    const unique = peers.filter((peer) => (attribute === 'id' ? peer.id : peer.getAttribute(attribute) || '') === value).length === 1
+    if (unique) return `${kind}:${normalize(value)}`
+  }
+  const fallback = container.getAttribute('data-automation-id') || container.getAttribute('aria-label') || kind
+  return `${kind}:${normalize(fallback)}:${index}`
+}
+
+export function isWorkdayMultiValueSkillsField(field: DetectedField): boolean {
+  if (field.canonical !== 'skills' || field.control.kind !== 'combobox') return false
+  const control = field.control.elements[0]
+  if (!control) return false
+  const evidence = [
+    control.getAttribute('data-automation-id'),
+    control.getAttribute('aria-label'),
+    ariaText(control),
+    labelForControl(control),
+    control.parentElement?.getAttribute('data-automation-id'),
+    control.closest('[role="group"], [role="region"]')?.getAttribute('aria-label'),
+  ]
+  return /\b(skills?|competencies|technologies)\b/.test(normalize(evidence.filter(Boolean).join(' ')))
 }
 
 export function matchWorkdayOption(labels: string[], desired: string, key: CanonicalField): number | null {
@@ -71,6 +175,15 @@ export function matchWorkdayOption(labels: string[], desired: string, key: Canon
   if (matched == null) return null
   const index = Number(matched)
   return Number.isInteger(index) && index >= 0 && index < labels.length ? index : null
+}
+
+export function matchWorkdaySkillOption(labels: string[], desired: string): number | null {
+  const wanted = normalizeSkill(desired)
+  if (!wanted) return null
+  const matches = labels
+    .map((label, index) => ({ index, normalized: normalizeSkill(label) }))
+    .filter((candidate) => candidate.normalized === wanted)
+  return matches.length === 1 ? matches[0]?.index ?? null : null
 }
 
 let comboboxQueue: Promise<void> = Promise.resolve()
@@ -84,6 +197,99 @@ export function fillWorkdayCombobox(field: DetectedField, desiredValue: string, 
     () => undefined,
   )
   return task
+}
+
+export function fillWorkdayMultiValueCombobox(
+  field: DetectedField,
+  desiredValues: string[],
+  timeoutMs = 1800,
+): Promise<FillResult> {
+  const requested = desiredValues.filter((value) => value.trim()).length
+  const task = comboboxQueue
+    .then(() => fillMultiValueNow(field, desiredValues, timeoutMs))
+    .catch(() => failedSkills('Workday changed this skills picker before it could be filled.', requested, 0, requested))
+  comboboxQueue = task.then(
+    () => undefined,
+    () => undefined,
+  )
+  return task
+}
+
+async function fillMultiValueNow(field: DetectedField, desiredValues: string[], timeoutMs: number): Promise<FillResult> {
+  const values = desiredValues.map((value) => value.trim()).filter(Boolean)
+  const requested = values.length
+  if (!requested) return { ok: false, status: 'skipped', message: 'No saved skills to add.', requested: 0, filled: 0, skipped: 0 }
+  const original = field.control.elements[0]
+  if (!original) return failedSkills('Missing Workday skills picker.', requested, 0, requested)
+  const doc = original.ownerDocument
+  const locator = controlLocator(original)
+  const resolve = () => resolveControl(doc, locator, original)
+  let filled = 0
+  let skipped = 0
+  let alreadySelected = 0
+
+  devLog('Workday multi-value skills picker detected', { requested })
+  for (let index = 0; index < values.length; index += 1) {
+    const desired = values[index]
+    if (!desired) continue
+    let control = resolve()
+    if (!control) {
+      skipped += values.length - index
+      break
+    }
+    if (selectedSkillValues(control).some((selected) => normalizeSkill(selected) === normalizeSkill(desired))) {
+      skipped += 1
+      alreadySelected += 1
+      continue
+    }
+
+    withSyntheticFill(() => {
+      control?.focus({ preventScroll: true })
+      control?.click()
+    })
+    control = resolve()
+    const editor = editableFor(control)
+    if (!control || !editor || editor.readOnly || editor.disabled) {
+      skipped += values.length - index
+      break
+    }
+    withSyntheticFill(() => typeIntoCombobox(editor, desired))
+
+    const option = await waitForSkillOption(doc, control, desired, Math.min(timeoutMs, 350))
+    if (!option) {
+      skipped += 1
+      withSyntheticFill(() => typeIntoCombobox(editor, ''))
+      continue
+    }
+    withSyntheticFill(() => clickOption(option))
+    const confirmed = await waitFor(
+      doc,
+      () => {
+        const current = resolve()
+        return Boolean(
+          current && selectedSkillValues(current).some((selected) => normalizeSkill(selected) === normalizeSkill(desired)),
+        )
+      },
+      Math.min(timeoutMs, 1200),
+    )
+    if (!confirmed) {
+      skipped += values.length - index
+      break
+    }
+    filled += 1
+  }
+
+  const message = `${filled} of ${requested} saved skills added; ${skipped} skipped or already selected.`
+  devLog('Workday multi-value skills fill finished', { requested, filled, skipped })
+  return {
+    ok: filled > 0 || alreadySelected === requested,
+    status: filled > 0 || alreadySelected === requested ? 'filled' : 'failed',
+    message,
+    requested,
+    filled,
+    skipped,
+    needsReview: filled + alreadySelected < requested,
+  }
 }
 
 async function fillComboboxNow(field: DetectedField, desiredValue: string, timeoutMs: number): Promise<FillResult> {
@@ -125,9 +331,7 @@ async function fillComboboxNow(field: DetectedField, desiredValue: string, timeo
   const wasExpanded = control?.getAttribute('aria-expanded') === 'true'
 
   withSyntheticFill(() => {
-    option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
-    option.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
-    option.click()
+    clickOption(option)
   })
 
   const confirmed = await waitFor(
@@ -153,6 +357,26 @@ async function fillComboboxNow(field: DetectedField, desiredValue: string, timeo
   if (!confirmed) return failed('Workday did not confirm the selected option.')
   devLog('Workday selection confirmed')
   return { ok: true, status: 'filled' }
+}
+
+async function waitForSkillOption(
+  doc: Document,
+  control: HTMLElement,
+  desired: string,
+  timeoutMs: number,
+): Promise<HTMLElement | null> {
+  let matched: HTMLElement | null = null
+  await waitFor(
+    doc,
+    () => {
+      const options = queryOptions(doc, control)
+      const index = matchWorkdaySkillOption(options.map(optionText), desired)
+      matched = index == null ? null : options[index] ?? null
+      return matched != null
+    },
+    timeoutMs,
+  )
+  return matched
 }
 
 interface ControlLocator {
@@ -202,6 +426,43 @@ function typeIntoCombobox(el: HTMLInputElement | HTMLTextAreaElement, value: str
   const tracked = el as (HTMLInputElement | HTMLTextAreaElement) & { _valueTracker?: { setValue: (next: string) => void } }
   tracked._valueTracker?.setValue(previous === value ? `${previous} ` : previous)
   el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }))
+}
+
+function clickOption(option: HTMLElement): void {
+  option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  option.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+  option.click()
+}
+
+function normalizeSkill(value: string): string {
+  return value.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g, ' ')
+}
+
+function selectedSkillValues(control: HTMLElement): string[] {
+  const root = skillWidgetRoot(control)
+  const selected = root.querySelectorAll(
+    '[data-automation-id*="selected" i], [data-automation-id*="chip" i], [data-automation-id*="pill" i], [role="listitem"]',
+  )
+  return Array.from(selected)
+    .filter((candidate): candidate is HTMLElement => candidate instanceof HTMLElement && !candidate.closest('[role="listbox"]'))
+    .map((candidate) => {
+      const clone = candidate.cloneNode(true) as HTMLElement
+      clone.querySelectorAll('button, [role="button"]').forEach((button) => button.remove())
+      return cleanText(candidate.getAttribute('data-value') || candidate.getAttribute('aria-label') || clone.textContent)
+    })
+    .filter(Boolean)
+}
+
+function skillWidgetRoot(control: HTMLElement): HTMLElement {
+  let current = control.parentElement
+  while (current && current.tagName !== 'FORM' && current.tagName !== 'BODY') {
+    const marker = normalize(
+      `${current.getAttribute('data-automation-id') || ''} ${current.getAttribute('aria-label') || ''} ${ariaText(current)}`,
+    )
+    if (/\b(skills?|competencies|technologies)\b/.test(marker)) return current
+    current = current.parentElement
+  }
+  return control.parentElement ?? control
 }
 
 function optionText(option: HTMLElement): string {
@@ -286,4 +547,9 @@ function waitFor(doc: Document, predicate: () => boolean, timeoutMs: number): Pr
 function failed(message: string): FillResult {
   devLog('Workday combobox fill stopped')
   return { ok: false, status: 'failed', message }
+}
+
+function failedSkills(message: string, requested: number, filled: number, skipped: number): FillResult {
+  devLog('Workday multi-value skills fill stopped', { requested, filled, skipped })
+  return { ok: false, status: 'failed', message, requested, filled, skipped }
 }

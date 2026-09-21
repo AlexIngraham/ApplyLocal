@@ -3,6 +3,7 @@ import type { CanonicalField } from '@/classifier/types'
 import type { Settings } from '@/settings/types'
 import { SENSITIVE_CATEGORIES } from '@/profile/types'
 import type { EducationEntry, EmploymentEntry, Profile, SensitiveCategory } from '@/profile/types'
+import type { ProposedValue, RepeatedSectionContext } from '@/adapters/types'
 
 function text(value: string | undefined): string | null {
   const trimmed = (value ?? '').trim()
@@ -34,8 +35,14 @@ export function sensitiveCategory(key: CanonicalField): SensitiveCategory | null
   return SENSITIVE_CATEGORIES.find((item) => item === category) ?? null
 }
 
-export function resolveProfileValue(profile: Profile, key: CanonicalField, index: number): string | null {
+export function resolveProfileValue(
+  profile: Profile,
+  key: CanonicalField,
+  index: number,
+  repeatedSection?: RepeatedSectionContext,
+): ProposedValue | null {
   const { personal, links, defaults } = profile
+  const repeatedIndex = sectionIndexFor(key, index, repeatedSection)
   switch (key) {
     case 'firstName':
       return text(personal.firstName)
@@ -70,36 +77,36 @@ export function resolveProfileValue(profile: Profile, key: CanonicalField, index
     case 'portfolio':
       return text(links.portfolio)
     case 'school':
-      return text(educationAt(profile, index)?.school)
+      return text(educationAt(profile, repeatedIndex)?.school)
     case 'degree':
-      return text(educationAt(profile, index)?.degree)
+      return text(educationAt(profile, repeatedIndex)?.degree)
     case 'major':
-      return text(educationAt(profile, index)?.major)
+      return text(educationAt(profile, repeatedIndex)?.major)
     case 'minor':
-      return text(educationAt(profile, index)?.minor)
+      return text(educationAt(profile, repeatedIndex)?.minor)
     case 'educationStart':
-      return text(educationAt(profile, index)?.startDate)
+      return text(educationAt(profile, repeatedIndex)?.startDate)
     case 'graduationDate':
-      return text(educationAt(profile, index)?.graduationDate)
+      return text(educationAt(profile, repeatedIndex)?.graduationDate)
     case 'gpa':
-      return text(educationAt(profile, index)?.gpa)
+      return text(educationAt(profile, repeatedIndex)?.gpa)
     case 'company':
-      return text(employmentAt(profile, index)?.company)
+      return text(employmentAt(profile, repeatedIndex)?.company)
     case 'jobTitle':
-      return text(employmentAt(profile, index)?.jobTitle)
+      return text(employmentAt(profile, repeatedIndex)?.jobTitle)
     case 'employmentStart':
-      return text(employmentAt(profile, index)?.startDate)
+      return text(employmentAt(profile, repeatedIndex)?.startDate)
     case 'employmentEnd':
-      return text(employmentAt(profile, index)?.endDate)
+      return text(employmentAt(profile, repeatedIndex)?.endDate)
     case 'currentPosition': {
-      const job = employmentAt(profile, index)
+      const job = employmentAt(profile, repeatedIndex)
       if (!job) return null
       return job.current ? 'yes' : 'no'
     }
     case 'employmentLocation':
-      return text(employmentAt(profile, index)?.location)
+      return text(employmentAt(profile, repeatedIndex)?.location)
     case 'employmentDescription':
-      return text(employmentAt(profile, index)?.description)
+      return text(employmentAt(profile, repeatedIndex)?.description)
     case 'workAuthorization':
       return text(defaults.workAuthorization)
     case 'requiresSponsorship':
@@ -120,11 +127,34 @@ export function resolveProfileValue(profile: Profile, key: CanonicalField, index
       return text(defaults.yearsOfExperience)
     case 'skills': {
       const skills = profile.skills.map((skill) => skill.trim()).filter(Boolean)
-      return skills.length ? skills.join(', ') : null
+      return skills.length ? skills : null
     }
     default:
       return null
   }
+}
+
+function sectionIndexFor(key: CanonicalField, fallback: number, section?: RepeatedSectionContext): number {
+  if (!section) return fallback
+  if (section.kind === 'education' && isEducationField(key)) return section.sectionIndex
+  if (section.kind === 'employment' && isEmploymentField(key)) return section.sectionIndex
+  return fallback
+}
+
+function isEducationField(key: CanonicalField): boolean {
+  return ['school', 'degree', 'major', 'minor', 'educationStart', 'graduationDate', 'gpa'].includes(key)
+}
+
+function isEmploymentField(key: CanonicalField): boolean {
+  return [
+    'company',
+    'jobTitle',
+    'employmentStart',
+    'employmentEnd',
+    'currentPosition',
+    'employmentLocation',
+    'employmentDescription',
+  ].includes(key)
 }
 
 function yearFrom(value: string | undefined): string | null {
@@ -132,7 +162,13 @@ function yearFrom(value: string | undefined): string | null {
   return match ? match[0] : null
 }
 
-export function proposedValue(profile: Profile, settings: Settings, key: CanonicalField, index: number): string | null {
+export function proposedValue(
+  profile: Profile,
+  settings: Settings,
+  key: CanonicalField,
+  index: number,
+  repeatedSection?: RepeatedSectionContext,
+): ProposedValue | null {
   const category = sensitiveCategory(key)
   if (category) {
     if (settings.neverAutofillSensitive) return null
@@ -140,7 +176,7 @@ export function proposedValue(profile: Profile, settings: Settings, key: Canonic
     if (!answer.autofillEnabled) return null
     return text(answer.value)
   }
-  return resolveProfileValue(profile, key, index)
+  return resolveProfileValue(profile, key, index, repeatedSection)
 }
 
 export function sensitiveBlocked(profile: Profile, settings: Settings, key: CanonicalField): boolean {

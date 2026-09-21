@@ -8,7 +8,7 @@ export function applyDetectedFields(fields: DetectedField[], mode: 'auto' | 'pag
     if (field.locked || field.status === 'manual' || field.status === 'autofilled') continue
     if (mode === 'auto' && field.plan !== 'autofill') continue
     if (mode === 'page' && field.fillBand !== 'high') continue
-    if (!field.proposedValue) continue
+    if (!hasValue(field.proposedValue)) continue
     if (!isControlEmpty(field)) {
       field.locked = true
       field.status = 'manual'
@@ -22,7 +22,7 @@ export function applyDetectedFields(fields: DetectedField[], mode: 'auto' | 'pag
 }
 
 export function fillOne(field: DetectedField): FillOutcome {
-  if (field.fillBand === 'blocked' || field.fillBand === 'none' || !field.proposedValue) {
+  if (field.fillBand === 'blocked' || field.fillBand === 'none' || !hasValue(field.proposedValue)) {
     return { ok: false, status: 'skipped', message: field.planReason }
   }
   return writeField(field)
@@ -32,13 +32,14 @@ export function undoField(field: DetectedField): void {
   if (field.previousValue == null) return
   restoreControl(field, field.previousValue)
   field.locked = true
-  field.status = field.proposedValue ? 'suggested' : 'skipped'
+  field.status = hasValue(field.proposedValue) ? 'suggested' : 'skipped'
   field.fillError = undefined
   field.planReason = 'Reverted. Automatic fill will not replace this unless you press Fill.'
 }
 
 function writeField(field: DetectedField): FillOutcome {
-  field.previousValue = readControl(field)
+  field.previousValue = field.control.multiValue ? null : readControl(field)
+  field.locked = true
   const result = getAdapter(field.adapterId).fill(field, field.proposedValue ?? '')
   if (result instanceof Promise) {
     return result.then((settled) => updateResult(field, settled))
@@ -48,12 +49,18 @@ function writeField(field: DetectedField): FillOutcome {
 
 function updateResult(field: DetectedField, result: FillResult): FillResult {
   if (result.ok) {
-    field.status = 'autofilled'
-    field.fillError = undefined
-    field.locked = false
+    field.status = result.needsReview ? 'suggested' : 'autofilled'
+    field.fillError = result.needsReview ? result.message : undefined
+    field.locked = Boolean(result.needsReview)
+    if (result.message) field.planReason = result.message
   } else {
     field.status = 'suggested'
     field.fillError = result.message
+    field.locked = true
   }
   return result
+}
+
+function hasValue(value: DetectedField['proposedValue']): boolean {
+  return Array.isArray(value) ? value.length > 0 : Boolean(value)
 }

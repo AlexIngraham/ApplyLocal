@@ -34,7 +34,8 @@ export function summarize(
   }
 }
 
-function preview(value: string | null): string | null {
+function preview(value: string | string[] | null): string | null {
   if (!value) return null
-  return value.length > 80 ? `${value.slice(0, 77)}…` : value
+  const display = Array.isArray(value) ? value.join(', ') : value
+  return display.length > 80 ? `${display.slice(0, 77)}…` : display
 }

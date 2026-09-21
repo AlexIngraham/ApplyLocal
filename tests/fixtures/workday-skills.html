@@ -1,0 +1,25 @@
+<main data-automation-id="applicationPage">
+  <form data-automation-id="jobApplication">
+    <div data-automation-id="skillsSection" role="group" aria-labelledby="skills-label">
+      <label id="skills-label" for="workday-skills">Skills</label>
+      <div data-automation-id="selectedSkills" role="list" aria-label="Selected skills">
+        <span data-automation-id="skillChip" role="listitem">React<button type="button" aria-label="Remove React"></button></span>
+      </div>
+      <input
+        id="workday-skills"
+        data-automation-id="skillsInput"
+        role="combobox"
+        aria-labelledby="skills-label"
+        aria-controls="skills-list"
+        aria-expanded="false"
+      />
+      <div id="skills-list" role="listbox" aria-busy="false">
+        <div role="option" data-automation-id="promptOption">TypeScript</div>
+        <div role="option" data-automation-id="promptOption">React</div>
+        <div role="option" data-automation-id="promptOption">Python</div>
+        <div role="option" data-automation-id="promptOption">C++</div>
+        <div role="option" data-automation-id="promptOption">C#</div>
+      </div>
+    </div>
+  </form>
+</main>

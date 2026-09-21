@@ -1,4 +1,4 @@
-import type { DetectedField, FillResult } from '@/adapters/types'
+import type { DetectedField, FillResult, ProposedValue } from '@/adapters/types'
 import { labelForControl } from '@/utils/dom'
 import { dispatchValueEvents, withSyntheticFill } from '@/utils/events'
 import { checkboxShouldBeChecked, matchChoice, parseMoney, toDate, toMonth } from '@/content/matchers'
@@ -37,8 +37,8 @@ export function formatForControl(value: string, inputType: string): string | nul
   return value
 }
 
-export function fillControl(field: DetectedField, value: string): FillResult {
-  return withSyntheticFill(() => fillControlInner(field, value))
+export function fillControl(field: DetectedField, value: ProposedValue): FillResult {
+  return withSyntheticFill(() => fillControlInner(field, Array.isArray(value) ? value.join(', ') : value))
 }
 
 function fillControlInner(field: DetectedField, value: string): FillResult {
@@ -135,6 +135,13 @@ export function isControlEmpty(field: DetectedField): boolean {
     return !(el instanceof HTMLInputElement && el.checked)
   }
   if (field.control.kind === 'combobox') {
+    if (field.control.multiValue) {
+      const editor = field.control.elements.find(
+        (item): item is HTMLInputElement | HTMLTextAreaElement =>
+          item instanceof HTMLInputElement || item instanceof HTMLTextAreaElement,
+      )
+      return editor ? editor.value.trim() === '' : true
+    }
     return readControl(field).trim() === ''
   }
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value.trim() === ''
