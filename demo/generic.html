@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Generic application</title>
+    <style>
+      body { font: 16px/1.4 "Segoe UI", sans-serif; margin: 32px auto; max-width: 640px; }
+      label, legend { display: block; margin-top: 12px; }
+      input, select { width: 100%; box-sizing: border-box; padding: 6px; }
+      fieldset { margin-top: 16px; }
+      .honeypot { position: absolute; left: -9999px; }
+    </style>
+  </head>
+  <body>
+    <h1>Software Engineer</h1>
+    <form id="application">
+      <label for="given">Given name</label>
+      <input id="given" type="text" />
+      <label for="surname">Surname</label>
+      <input id="surname" type="text" />
+      <label for="mail">E-mail address</label>
+      <input id="mail" type="email" />
+      <label for="mobile">Mobile phone</label>
+      <input id="mobile" type="tel" />
+      <label for="github">GitHub URL</label>
+      <input id="github" type="url" />
+      <label for="school">University</label>
+      <input id="school" type="text" />
+      <label for="major">Major</label>
+      <input id="major" type="text" />
+      <label for="grad">Graduation date</label>
+      <input id="grad" type="month" />
+      <label class="honeypot" for="trap">Leave this field blank</label>
+      <input id="trap" class="honeypot" name="email" type="text" />
+      <fieldset>
+        <legend>Are you legally authorized to work in the United States?</legend>
+        <label><input id="auth" type="checkbox" /> I am legally authorized to work in the United States</label>
+      </fieldset>
+      <label for="visa">Require visa sponsorship</label>
+      <select id="visa">
+        <option value="">Select</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+      <fieldset>
+        <legend>Are you willing to relocate?</legend>
+        <label><input type="radio" name="relocate" value="yes" /> Yes</label>
+        <label><input type="radio" name="relocate" value="no" /> No</label>
+      </fieldset>
+      <label for="gender">Gender</label>
+      <select id="gender">
+        <option value="">Select</option>
+        <option>Female</option>
+        <option>Male</option>
+      </select>
+      <p><button type="submit">Submit application</button></p>
+    </form>
+    <script>
+      document.querySelector('form').addEventListener('submit', (event) => {
+        event.preventDefault()
+        location.href = './thanks.html'
+      })
+    </script>
+  </body>
+</html>

@@ -1,0 +1,77 @@
+<form id="application_form" action="https://boards.greenhouse.io/acme/jobs/1">
+  <div class="field">
+    <label for="bare_start">Start date</label>
+    <input id="bare_start" type="text" />
+  </div>
+  <div class="field">
+    <label for="first_name">First Name</label>
+    <input id="first_name" name="job_application[first_name]" type="text" />
+  </div>
+  <div class="field">
+    <label for="last_name">Last Name</label>
+    <input id="last_name" name="job_application[last_name]" type="text" />
+  </div>
+  <div class="field">
+    <label for="email">Email</label>
+    <input id="email" name="job_application[email]" type="email" />
+  </div>
+  <div class="field">
+    <label for="phone">Phone</label>
+    <input id="phone" name="job_application[phone]" type="tel" />
+  </div>
+  <div class="field">
+    <label for="linkedin">LinkedIn Profile</label>
+    <input id="linkedin" name="job_application[linkedin_profile]" type="text" />
+  </div>
+  <div class="field">
+    <label for="work_auth">Are you legally authorized to work in the United States?</label>
+    <select id="work_auth">
+      <option value="">Select</option>
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="future_sponsor">Will you now or in the future require employer sponsorship?</label>
+    <select id="future_sponsor">
+      <option value="">Select</option>
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="gender">Gender</label>
+    <select id="gender">
+      <option value="">Select</option>
+      <option value="female">Female</option>
+      <option value="male">Male</option>
+      <option value="decline">Decline to self-identify</option>
+    </select>
+  </div>
+  <h2>Education</h2>
+  <div class="field">
+    <label for="school_1">School</label>
+    <input id="school_1" type="text" />
+  </div>
+  <div class="field">
+    <label for="degree_1">Degree</label>
+    <input id="degree_1" type="text" />
+  </div>
+  <div class="field">
+    <label for="school_2">School</label>
+    <input id="school_2" type="text" />
+  </div>
+  <h2>Experience</h2>
+  <div class="field">
+    <label for="company">Company</label>
+    <input id="company" type="text" />
+  </div>
+  <div class="field">
+    <label for="title">Job title</label>
+    <input id="title" type="text" />
+  </div>
+  <div class="field">
+    <label for="emp_start">Start date</label>
+    <input id="emp_start" type="month" />
+  </div>
+</form>

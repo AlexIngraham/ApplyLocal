@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lever-shaped application</title>
+    <style>
+      body { font: 16px/1.4 "Segoe UI", sans-serif; margin: 32px auto; max-width: 640px; }
+      label { display: block; margin-top: 12px; }
+      input, select { width: 100%; box-sizing: border-box; padding: 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>Backend Engineer</h1>
+    <form class="application-form">
+      <label for="name">Full name</label>
+      <input id="name" name="name" type="text" />
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" />
+      <label for="phone">Phone</label>
+      <input id="phone" name="phone" type="tel" />
+      <label for="org">Current company</label>
+      <input id="org" name="org" type="text" />
+      <label for="location">Location</label>
+      <input id="location" name="location" type="text" />
+      <label for="linkedin">LinkedIn URL</label>
+      <input id="linkedin" name="urls[LinkedIn]" type="url" />
+      <label for="github">GitHub URL</label>
+      <input id="github" name="urls[GitHub]" type="url" />
+      <label for="resume">Resume</label>
+      <input id="resume" name="resume" type="file" />
+      <label for="sponsor">Will you now or in the future require employer sponsorship?</label>
+      <select id="sponsor">
+        <option value="">Select</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+      <p><button type="submit">Submit application</button></p>
+    </form>
+  </body>
+</html>
