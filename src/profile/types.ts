@@ -82,7 +82,9 @@ export interface Profile {
   version: 1
   personal: PersonalInfo
   links: LinkInfo
+  /** Saved display order, preferably most recent first; never implicitly sorted. */
   education: EducationEntry[]
+  /** employment[0] is the first Workday entry. Prefer most recent first. */
   employment: EmploymentEntry[]
   defaults: ApplicationDefaults
   sensitive: Record<SensitiveCategory, SensitiveAnswer>

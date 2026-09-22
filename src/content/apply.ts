@@ -1,3 +1,4 @@
+import { workdayVisible } from '@/adapters/workdaySections'
 import type { DetectedField, FillOutcome, FillResult } from '@/adapters/types'
 import { isControlEmpty, readControl, restoreControl } from '@/content/filler'
 import { getAdapter } from '@/adapters/registry'
@@ -5,6 +6,7 @@ import { getAdapter } from '@/adapters/registry'
 export function applyDetectedFields(fields: DetectedField[], mode: 'auto' | 'page'): Promise<void> {
   const pending: Promise<FillResult>[] = []
   for (const field of fields) {
+    if (!field.control.elements[0] || !workdayVisible(field.control.elements[0])) continue
     if (field.locked || field.status === 'manual' || field.status === 'autofilled') continue
     if (mode === 'auto' && field.plan !== 'autofill') continue
     if (mode === 'page' && field.fillBand !== 'high') continue
@@ -38,6 +40,7 @@ export function undoField(field: DetectedField): void {
 }
 
 function writeField(field: DetectedField): FillOutcome {
+  if (!field.control.elements[0] || !workdayVisible(field.control.elements[0])) return { ok: false, status: 'skipped', message: 'This control is no longer active.' }
   field.previousValue = field.control.multiValue ? null : readControl(field)
   field.locked = true
   const result = getAdapter(field.adapterId).fill(field, field.proposedValue ?? '')
@@ -48,6 +51,7 @@ function writeField(field: DetectedField): FillOutcome {
 }
 
 function updateResult(field: DetectedField, result: FillResult): FillResult {
+  if (field.status === 'manual') return result
   if (result.ok) {
     field.status = result.needsReview ? 'suggested' : 'autofilled'
     field.fillError = result.needsReview ? result.message : undefined

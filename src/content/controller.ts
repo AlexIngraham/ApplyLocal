@@ -1,3 +1,5 @@
+import { watchWorkdaySections, workdayVisible } from '@/adapters/workdaySections'
+import { ariaText, labelForControl } from '@/utils/dom'
 import type { CanonicalField } from '@/classifier/types'
 import type { DetectedField } from '@/adapters/types'
 import type { AtsId } from '@/platform/detect'
@@ -23,12 +25,16 @@ import type { ContentRequest, ContentResponse, ScanSnapshot } from '@/shared/mes
 
 type Overlay = ReturnType<typeof createOverlay>
 
-export function startController(doc: Document, win: Window): void {
+export function startController(doc: Document, win: Window): () => void {
   let profile: Profile | null = null
   let settings: Settings | null = null
   let fields: DetectedField[] = []
   const byElement = new WeakMap<HTMLElement, DetectedField>()
   const manuallyEdited = new Set<string>()
+  const identities = new WeakMap<DetectedField, string>()
+  type Retained = Pick<DetectedField, 'locked' | 'status' | 'previousValue' | 'fillError' | 'planReason'>
+  const retained = new Map<string, Retained>()
+  let stopSections: (() => void) | null = null
   let fieldSequence = 0
   let overlay: Overlay | null = null
   let stopObserver: (() => void) | null = null
@@ -43,15 +49,16 @@ export function startController(doc: Document, win: Window): void {
     if (settings.enabled) activate()
   })()
 
-  chrome.runtime.onMessage.addListener((message: ContentRequest, _sender, sendResponse) => {
+  const onMessage: Parameters<typeof chrome.runtime.onMessage.addListener>[0] = (message: ContentRequest, _sender, sendResponse) => {
     void ready
       .then(() => handle(message))
       .then(sendResponse)
       .catch(() => sendResponse({ ok: false, error: 'ApplyLocal could not read this page.' }))
     return true
-  })
+  }
+  chrome.runtime.onMessage.addListener(onMessage)
 
-  chrome.storage.onChanged.addListener((changes, area) => {
+  const onStorage: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (changes, area) => {
     if (area !== 'local' || (!changes.profile && !changes.settings)) return
     void ready.then(async () => {
       profile = await loadProfile()
@@ -63,8 +70,9 @@ export function startController(doc: Document, win: Window): void {
       if (!started) activate()
       else refresh()
     })
-  })
+  }
 
+  chrome.storage.onChanged.addListener(onStorage)
   doc.addEventListener('input', onUserEdit, true)
   doc.addEventListener('change', onUserEdit, true)
 
@@ -81,6 +89,7 @@ export function startController(doc: Document, win: Window): void {
   function activate() {
     if (!profile || !settings || started) return
     started = true
+    stopSections = watchWorkdaySections(doc)
     overlay = createOverlay(doc, {
       onFill: (id) => {
         const field = fields.find((item) => item.id === id)
@@ -106,12 +115,14 @@ export function startController(doc: Document, win: Window): void {
       for (const node of nodes) rescan(node)
       if (settings?.autoFillHighConfidence) void applyDetectedFields(fields, 'auto').then(paint)
       paint()
-    })
+    }, true)
     maybeOfferToSave()
     devLog('scan ready', { fields: fields.length, ats })
   }
 
   function deactivate() {
+    stopSections?.()
+    stopSections = null
     stopObserver?.()
     stopObserver = null
     overlay?.destroy()
@@ -137,8 +148,13 @@ export function startController(doc: Document, win: Window): void {
   }
 
   function merge(detected: DetectedField[]) {
+    for (const old of fields) {
+      retained.set(fieldKey(old), { locked: old.locked, status: old.status, previousValue: old.previousValue, fillError: old.fillError, planReason: old.planReason })
+    }
+    const next: DetectedField[] = []
     for (const field of detected) {
-      let existing = field.control.elements.map((el) => byElement.get(el)).find((item) => item !== undefined)
+      identities.set(field, fieldKey(field))
+      let existing = field.control.elements.map((el) => byElement.get(el)).find((item) => item !== undefined && fieldKey(item) === fieldKey(field))
       if (!existing) {
         const key = fieldKey(field)
         existing = fields.find(
@@ -161,18 +177,21 @@ export function startController(doc: Document, win: Window): void {
         if (!existing.fillError && !existing.locked) existing.planReason = field.planReason
         for (const el of field.control.elements) byElement.set(el, existing)
         if (!existing.locked && existing.status !== 'autofilled' && existing.status !== 'manual') existing.status = field.status
+        next.push(existing)
         continue
       }
       field.id = `f${++fieldSequence}`
+      const previous = retained.get(fieldKey(field))
+      if (previous) Object.assign(field, previous)
       if (manuallyEdited.has(fieldKey(field))) {
         field.locked = true
         field.status = 'manual'
         field.planReason = 'You edited this field, so ApplyLocal will leave it alone.'
       }
-      fields.push(field)
+      next.push(field)
       for (const el of field.control.elements) byElement.set(el, field)
     }
-    fields = fields.filter((field) => field.control.elements.some((el) => el.isConnected))
+    fields = next.filter((field) => field.control.elements.some((el) => el.isConnected))
   }
 
   function paint() {
@@ -182,7 +201,7 @@ export function startController(doc: Document, win: Window): void {
     }
     overlay?.sync(
       fields
-        .filter((field) => field.fillBand !== 'none' && field.control.elements[0])
+        .filter((field) => field.fillBand !== 'none' && field.control.elements[0] && workdayVisible(field.control.elements[0]))
         .map(toModel),
     )
   }
@@ -191,8 +210,13 @@ export function startController(doc: Document, win: Window): void {
     if (isSyntheticFill()) return
     const target = event.target
     if (!(target instanceof HTMLElement)) return
-    const field = byElement.get(target)
-    if (!field || field.locked) return
+    let field = byElement.get(target)
+    // A user can type into a React replacement before the debounced rescan fires.
+    if (!field && started && target.matches('input, textarea, select, [role="combobox"]')) {
+      rescan(doc)
+      field = byElement.get(target)
+    }
+    if (!field) return
     field.locked = true
     field.status = 'manual'
     field.planReason = 'You edited this field, so ApplyLocal will leave it alone.'
@@ -240,6 +264,7 @@ export function startController(doc: Document, win: Window): void {
     if (!started) activate()
     if (message.type === 'al:scan') refresh()
     if (message.type === 'al:autofill') {
+      rescan(doc)
       await applyDetectedFields(fields, 'page')
       paint()
     }
@@ -277,8 +302,12 @@ export function startController(doc: Document, win: Window): void {
   }
 
   function fieldKey(field: DetectedField): string {
+    const stored = identities.get(field)
+    if (stored) return stored
     const el = field.control.elements[0]
-    const identity =
+    const identity = field.adapterId === 'workday'
+      ? `${el?.getAttribute('data-automation-id') || ''}|${el ? ariaText(el) || labelForControl(el) : field.label}|${el?.getAttribute('placeholder') || ''}`
+      :
       el?.getAttribute('data-automation-id') ||
       el?.getAttribute('name') ||
       el?.getAttribute('id') ||
@@ -286,6 +315,14 @@ export function startController(doc: Document, win: Window): void {
       field.label
     const section = field.repeatedSection?.sectionKey ?? field.repeatIndex
     return `${field.adapterId}|${field.canonical}|${identity}|${section}`
+  }
+
+  return () => {
+    deactivate()
+    doc.removeEventListener('input', onUserEdit, true)
+    doc.removeEventListener('change', onUserEdit, true)
+    chrome.runtime.onMessage.removeListener(onMessage)
+    chrome.storage.onChanged.removeListener(onStorage)
   }
 
   function displayValue(value: DetectedField['proposedValue']): string | null {

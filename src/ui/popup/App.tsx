@@ -1,3 +1,6 @@
+import { BackupData } from '@/ui/popup/BackupData'
+import { restoreBackup } from '@/backup/serialization'
+import type { Backup } from '@/backup/serialization'
 import { useEffect, useRef, useState } from 'react'
 import type { ApplicationRecord } from '@/applicationTracker/types'
 import { listApplications, removeApplication, updateApplication } from '@/applicationTracker/storage'
@@ -44,6 +47,8 @@ export function App() {
     return () => chrome.storage.onChanged.removeListener(onChanged)
   }, [])
 
+  const profileTimer = useRef(0)
+  const settingsTimer = useRef(0)
   const profileReady = useRef(false)
   const settingsReady = useRef(false)
 
@@ -53,7 +58,7 @@ export function App() {
       profileReady.current = true
       return
     }
-    const timer = window.setTimeout(() => {
+    const timer = profileTimer.current = window.setTimeout(() => {
       void saveProfile(profile).then(() => setNotice('Saved on this device'))
     }, 300)
     return () => window.clearTimeout(timer)
@@ -65,7 +70,7 @@ export function App() {
       settingsReady.current = true
       return
     }
-    const timer = window.setTimeout(() => {
+    const timer = settingsTimer.current = window.setTimeout(() => {
       void saveSettings(settings)
     }, 200)
     return () => window.clearTimeout(timer)
@@ -73,6 +78,16 @@ export function App() {
 
   if (!profile || !settings) {
     return <main className="app loading">Loading your local profile…</main>
+  }
+
+  async function importData(backup: Backup) {
+    // Cancel autosaves of the old values before committing the validated pair.
+    window.clearTimeout(profileTimer.current)
+    window.clearTimeout(settingsTimer.current)
+    const restored = await restoreBackup(backup)
+    setProfile(restored.profile)
+    setSettings(restored.settings)
+    setNotice('Backup restored')
   }
 
   async function scan() {
@@ -135,7 +150,7 @@ export function App() {
             }}
           />
         ) : null}
-        {tab === 'settings' ? <SettingsForm settings={settings} onChange={setSettings} /> : null}
+        {tab === 'settings' ? <div className="stack"><SettingsForm settings={settings} onChange={setSettings} /><BackupData profile={profile} settings={settings} onRestore={importData} /></div> : null}
       </section>
     </main>
   )

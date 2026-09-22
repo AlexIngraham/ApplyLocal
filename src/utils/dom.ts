@@ -17,6 +17,7 @@ export function collectElements(root: ParentNode): Element[] {
       if (el.shadowRoot) visit(el.shadowRoot)
     })
   }
+  if (root instanceof Element) out.push(root)
   visit(root)
   return out
 }

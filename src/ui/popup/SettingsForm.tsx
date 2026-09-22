@@ -27,7 +27,7 @@ export function SettingsForm({ settings, onChange }: SettingsFormProps) {
       />
       <Toggle
         label="Use site adapters"
-        description="Greenhouse and Lever get extra field-name rules. Generic detection stays on either way."
+        description="Greenhouse, Lever, and Workday get site-specific field rules. Generic detection stays on either way."
         checked={settings.enableSiteAdapters}
         onChange={(enableSiteAdapters) => patch({ enableSiteAdapters })}
       />

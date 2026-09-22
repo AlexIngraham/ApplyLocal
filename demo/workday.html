@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Workday layout demo</title>
+<style>
+body { font: 16px/1.5 system-ui; max-width: 900px; margin: 30px auto; padding: 20px; }
+label { display:block; margin:12px 0; } input { display:block; padding:8px; }
+article, [data-automation-id="workExperienceEditor"] { border:1px solid #ccc; padding:20px; margin:16px 0; }
+button { padding:8px; margin:5px; } [role="option"] { cursor:pointer; padding:6px; border:1px solid #ccc; }
+</style></head><body><h1>Workday layout demo</h1>
+<p>Use two employment and education entries in your profile. All navigation below is manual; nothing is submitted.</p>
+<button id="stacked">Stacked cards</button><button id="single">One editor at a time</button><button id="skills">Skills step</button>
+<div id="stage"></div>
+<template id="stacked-template"><main data-automation-id="applicationPage">
+  <form data-automation-id="jobApplication">
+    <section data-automation-id="workExperienceSection">
+      <h2>Work Experience</h2>
+      <article data-automation-id="workExperienceCard" aria-label="Work Experience 1">
+        <h3>Work Experience 1</h3>
+        <label for="job-1-title">Job Title</label>
+        <input id="job-1-title" data-automation-id="jobTitle" />
+        <label for="job-1-company">Company</label>
+        <input id="job-1-company" data-automation-id="company" />
+        <label for="job-1-start">Start Date</label>
+        <input id="job-1-start" data-automation-id="startDate" type="month" />
+        <label for="job-1-end">End Date</label>
+        <input id="job-1-end" data-automation-id="endDate" type="month" />
+        <label for="job-1-location">Work Location</label>
+        <input id="job-1-location" data-automation-id="location" />
+      </article>
+      <article data-automation-id="workExperienceCard" aria-label="Work Experience 2">
+        <h3>Work Experience 2</h3>
+        <label for="job-2-company">Company</label>
+        <input id="job-2-company" data-automation-id="company" />
+        <label for="job-2-location">Location</label>
+        <input id="job-2-location" data-automation-id="location" />
+        <label for="job-2-start">Start Date</label>
+        <input id="job-2-start" data-automation-id="startDate" type="month" />
+        <label for="job-2-title">Job Title</label>
+        <input id="job-2-title" data-automation-id="jobTitle" />
+        <label for="job-2-end">End Date</label>
+        <input id="job-2-end" data-automation-id="endDate" type="month" />
+      </article>
+    </section>
+
+    <section data-automation-id="educationSection">
+      <h2>Education</h2>
+      <article data-automation-id="educationCard" aria-label="Education 1">
+        <h3>Education 1</h3>
+        <label for="edu-1-major">Field of Study</label>
+        <input id="edu-1-major" data-automation-id="fieldOfStudy" />
+        <label for="edu-1-school">School</label>
+        <input id="edu-1-school" data-automation-id="school" />
+        <label for="edu-1-start">Start Date</label>
+        <input id="edu-1-start" data-automation-id="startDate" type="month" />
+        <label for="edu-1-degree">Degree</label>
+        <input id="edu-1-degree" data-automation-id="degree" />
+        <label for="edu-1-end">End Date</label>
+        <input id="edu-1-end" data-automation-id="endDate" type="month" />
+      </article>
+      <article data-automation-id="educationCard" aria-label="Education 2">
+        <h3>Education 2</h3>
+        <label for="edu-2-school">School</label>
+        <input id="edu-2-school" data-automation-id="school" />
+        <label for="edu-2-degree">Degree</label>
+        <input id="edu-2-degree" data-automation-id="degree" />
+        <label for="edu-2-end">End Date</label>
+        <input id="edu-2-end" data-automation-id="endDate" type="month" />
+        <label for="edu-2-major">Major</label>
+        <input id="edu-2-major" data-automation-id="major" />
+        <label for="edu-2-start">Start Date</label>
+        <input id="edu-2-start" data-automation-id="startDate" type="month" />
+      </article>
+    </section>
+  </form>
+</main>
+</template>
+<template id="single-template"><main data-automation-id="applicationPage">
+  <section data-automation-id="workExperienceSection" aria-labelledby="experience-heading">
+    <h2 id="experience-heading">Work Experience</h2>
+    <div id="summaries"></div>
+    <button type="button">Add Another</button>
+    <div data-automation-id="workExperienceEditor">
+      <label>Company <input data-automation-id="company"></label>
+      <label>Job Title <input data-automation-id="jobTitle"></label>
+      <label>From <input data-automation-id="startDate" type="month"></label>
+      <label>To <input data-automation-id="endDate" type="month"></label>
+      <label>Location <input data-automation-id="location"></label>
+    </div>
+  </section>
+</main>
+</template>
+<template id="skills-template"><main data-automation-id="applicationPage">
+  <form data-automation-id="jobApplication">
+    <div data-automation-id="skillsSection" role="group" aria-labelledby="skills-label">
+      <label id="skills-label" for="workday-skills">Skills</label>
+      <div data-automation-id="selectedSkills" role="list" aria-label="Selected skills">
+        <span data-automation-id="skillChip" role="listitem">React<button type="button" aria-label="Remove React"></button></span>
+      </div>
+      <input
+        id="workday-skills"
+        data-automation-id="skillsInput"
+        role="combobox"
+        aria-labelledby="skills-label"
+        aria-controls="skills-list"
+        aria-expanded="false"
+      />
+      <div id="skills-list" role="listbox" aria-busy="false">
+        <div role="option" data-automation-id="promptOption">TypeScript</div>
+        <div role="option" data-automation-id="promptOption">React</div>
+        <div role="option" data-automation-id="promptOption">Python</div>
+        <div role="option" data-automation-id="promptOption">C++</div>
+        <div role="option" data-automation-id="promptOption">C#</div>
+      </div>
+    </div>
+  </form>
+</main>
+</template>
+<script>
+const stage = document.getElementById('stage');
+function show(mode) {
+  stage.replaceChildren(document.getElementById(mode + '-template').content.cloneNode(true));
+  history.replaceState({}, '', '#' + mode);
+  if (mode === 'single') {
+    let index = 0;
+    stage.querySelector('button').addEventListener('click', () => {
+      const editor = stage.querySelector('[data-automation-id="workExperienceEditor"]');
+      const summary = document.createElement('article');
+      summary.dataset.automationId = 'workExperienceSummary';
+      const heading = document.createElement('h3'); heading.textContent = 'Work Experience ' + (++index);
+      const text = document.createElement('p');
+      text.textContent = [...editor.querySelectorAll('input')].map(input => input.value).filter(Boolean).join(' · ');
+      summary.append(heading, text); stage.querySelector('#summaries').append(summary);
+      editor.outerHTML = editor.outerHTML;
+    });
+  }
+  if (mode === 'skills') {
+    const list = stage.querySelector('[role="listbox"]'); list.replaceChildren();
+    const selected = stage.querySelector('[data-automation-id="selectedSkills"]');
+    function wire(input) {
+      input.addEventListener('input', () => {
+        const value = input.value.trim(); list.replaceChildren();
+        setTimeout(() => {
+          if (!input.isConnected || input.value.trim() !== value) return;
+          for (const skill of ['TypeScript', 'React', 'Python', 'C', 'C++', 'C#']) {
+            if (skill.toLowerCase() !== value.toLowerCase()) continue;
+            const option = document.createElement('div'); option.setAttribute('role', 'option'); option.textContent = skill;
+            option.addEventListener('click', () => {
+              const chip = document.createElement('span'); chip.dataset.automationId = 'skillChip'; chip.textContent = skill + ' '; selected.append(chip);
+              const next = input.cloneNode(); next.value = ''; input.replaceWith(next); wire(next); list.replaceChildren();
+            });
+            list.append(option);
+          }
+        }, 500);
+      });
+    }
+    wire(stage.querySelector('[role="combobox"]'));
+  }
+}
+for (const mode of ['stacked', 'single', 'skills']) document.getElementById(mode).addEventListener('click', () => show(mode));
+show('stacked');
+</script></body></html>

@@ -1,4 +1,6 @@
-import type { AdapterHint, DetectedField, FillResult, RepeatedSectionMatch } from '@/adapters/types'
+import { findWorkdayRepeatedSection, workdayVisible } from '@/adapters/workdaySections'
+export { findWorkdayRepeatedSection } from '@/adapters/workdaySections'
+import type { AdapterHint, DetectedField, FillResult } from '@/adapters/types'
 import type { CanonicalField } from '@/classifier/types'
 import { normalize } from '@/classifier/normalize'
 import { matchChoice } from '@/content/matchers'
@@ -56,7 +58,7 @@ export function isWorkdayDom(root: ParentNode): boolean {
   )
 }
 
-export function workdayHintFor(el: Element): AdapterHint | null {
+export function workdayHintFor(el: Element, sectionFor = findWorkdayRepeatedSection): AdapterHint | null {
   const pieces = [
     el.getAttribute('data-automation-id'),
     el.getAttribute('name'),
@@ -72,7 +74,7 @@ export function workdayHintFor(el: Element): AdapterHint | null {
   const text = normalize(pieces.filter(Boolean).join(' '))
   const repeated =
     el instanceof HTMLElement && /\b(location|start|from|end|to|current position|currently work|current job)\b/.test(text)
-      ? findWorkdayRepeatedSection(el)
+      ? sectionFor(el)
       : null
   if (repeated?.kind === 'employment') {
     if (/\b(work |job |employment )?location\b/.test(text)) return hint('employmentLocation', 'Location in a Workday experience card')
@@ -88,79 +90,6 @@ export function workdayHintFor(el: Element): AdapterHint | null {
     if (pattern.test(text)) return value
   }
   return null
-}
-
-export function findWorkdayRepeatedSection(el: HTMLElement): RepeatedSectionMatch | null {
-  const doc = el.ownerDocument
-  for (const kind of ['employment', 'education'] as const) {
-    const containers = repeatedContainers(doc, kind)
-    const container = containers.find((candidate) => candidate.contains(el))
-    if (!container) continue
-    const sectionIndex = containers.indexOf(container)
-    return {
-      kind,
-      container,
-      sectionIndex,
-      sectionKey: sectionKey(container, kind, sectionIndex, containers),
-    }
-  }
-  return null
-}
-
-function repeatedContainers(doc: Document, kind: 'employment' | 'education'): HTMLElement[] {
-  const possible = Array.from(
-    doc.querySelectorAll('[data-automation-id], section, article, fieldset, [role="group"], [role="region"]'),
-  ).filter((candidate): candidate is HTMLElement => candidate instanceof HTMLElement && repeatedContainerKind(candidate) === kind)
-  return possible.filter(
-    (candidate) => !possible.some((other) => other !== candidate && candidate.contains(other)),
-  )
-}
-
-function repeatedContainerKind(el: HTMLElement): 'employment' | 'education' | null {
-  const automation = normalize(el.getAttribute('data-automation-id') || '')
-  const identity = normalize(`${el.id} ${el.getAttribute('aria-label') || ''} ${ariaText(el)} ${directHeading(el)}`)
-  const marker = `${automation} ${identity}`.trim()
-  const kind = kindFromText(marker)
-  if (!kind) return null
-
-  const role = el.getAttribute('role')
-  const semanticRole = role === 'group' || role === 'region'
-  const semanticTag = el.tagName === 'ARTICLE' || el.tagName === 'FIELDSET'
-  const entryMarker = /\b(card|entry|item|record|panel|detail)\b|\b\d+\b/.test(marker)
-  const exactMarker = /^(work experience|employment|education)$/.test(automation)
-  const outerMarker = /\b(section|page|list|container)\b/.test(automation)
-  if (outerMarker && !entryMarker && !semanticRole && !semanticTag) return null
-  return entryMarker || exactMarker || semanticRole || semanticTag ? kind : null
-}
-
-function kindFromText(text: string): 'employment' | 'education' | null {
-  if (/\b(work experience|employment|job history|professional experience)\b/.test(text)) return 'employment'
-  if (/\b(education|academic history)\b/.test(text)) return 'education'
-  return null
-}
-
-function directHeading(el: HTMLElement): string {
-  for (const child of Array.from(el.children)) {
-    if (/^H[1-6]$/.test(child.tagName) || child.tagName === 'LEGEND') return cleanText(child.textContent)
-  }
-  return ''
-}
-
-function sectionKey(
-  container: HTMLElement,
-  kind: 'employment' | 'education',
-  index: number,
-  peers: HTMLElement[],
-): string {
-  const attributes = ['data-instance-id', 'id', 'aria-label', 'data-automation-id'] as const
-  for (const attribute of attributes) {
-    const value = attribute === 'id' ? container.id : container.getAttribute(attribute) || ''
-    if (!value) continue
-    const unique = peers.filter((peer) => (attribute === 'id' ? peer.id : peer.getAttribute(attribute) || '') === value).length === 1
-    if (unique) return `${kind}:${normalize(value)}`
-  }
-  const fallback = container.getAttribute('data-automation-id') || container.getAttribute('aria-label') || kind
-  return `${kind}:${normalize(fallback)}:${index}`
 }
 
 export function isWorkdayMultiValueSkillsField(field: DetectedField): boolean {
@@ -225,13 +154,13 @@ export function fillWorkdayMultiValueCombobox(
 }
 
 async function fillMultiValueNow(field: DetectedField, desiredValues: string[], timeoutMs: number): Promise<FillResult> {
-  const values = desiredValues.map((value) => value.trim()).filter(Boolean)
+  const values = [...new Map(desiredValues.map((value) => [normalizeSkill(value), value.trim()])).values()].filter(Boolean)
   const requested = values.length
   if (!requested) return { ok: false, status: 'skipped', message: 'No saved skills to add.', requested: 0, filled: 0, skipped: 0 }
   const original = field.control.elements[0]
   if (!original) return failedSkills('Missing Workday skills picker.', requested, 0, requested)
   const doc = original.ownerDocument
-  const locator = controlLocator(original)
+  const locator = controlLocator(original, field)
   const resolve = () => resolveControl(doc, locator, original)
   let filled = 0
   let skipped = 0
@@ -241,6 +170,7 @@ async function fillMultiValueNow(field: DetectedField, desiredValues: string[], 
   for (let index = 0; index < values.length; index += 1) {
     const desired = values[index]
     if (!desired) continue
+    if (userEdited(field)) { skipped += values.length - index; break }
     let control = resolve()
     if (!control) {
       skipped += values.length - index
@@ -264,12 +194,15 @@ async function fillMultiValueNow(field: DetectedField, desiredValues: string[], 
     }
     withSyntheticFill(() => typeIntoCombobox(editor, desired))
 
-    const option = await waitForSkillOption(doc, control, desired, Math.min(timeoutMs, 350))
+    const option = await waitForSkillOption(doc, resolve, desired, timeoutMs)
     if (!option) {
       skipped += 1
-      withSyntheticFill(() => typeIntoCombobox(editor, ''))
+      const currentEditor = editableFor(resolve())
+      if (currentEditor) withSyntheticFill(() => typeIntoCombobox(currentEditor, ''))
+      devLog('Workday skill option unavailable or ambiguous; skipping')
       continue
     }
+    if (userEdited(field)) { skipped += values.length - index; break }
     withSyntheticFill(() => clickOption(option))
     const confirmed = await waitFor(
       doc,
@@ -305,7 +238,7 @@ async function fillComboboxNow(field: DetectedField, desiredValue: string, timeo
   const original = field.control.elements[0]
   if (!original) return failed('Missing Workday combobox.')
   const doc = original.ownerDocument
-  const locator = controlLocator(original)
+  const locator = controlLocator(original, field)
   const resolve = () => resolveControl(doc, locator, original)
   let control = resolve()
   if (!control) return failed('The Workday combobox is no longer on the page.')
@@ -323,7 +256,7 @@ async function fillComboboxNow(field: DetectedField, desiredValue: string, timeo
     withSyntheticFill(() => typeIntoCombobox(editor, desiredValue))
   }
 
-  const options = await waitForOptions(doc, control, timeoutMs)
+  const options = await waitForOptions(doc, resolve, timeoutMs)
   devLog('Workday options found', { count: options.length })
   if (!options.length) return failed('Workday did not show any choices for this field.')
   const labels = options.map(optionText)
@@ -332,13 +265,14 @@ async function fillComboboxNow(field: DetectedField, desiredValue: string, timeo
   const option = options[matchIndex]
   if (!option) return failed('The matching Workday option disappeared.')
   const matchedLabel = labels[matchIndex] || ''
-  devLog('Workday option matched', { option: matchedLabel.slice(0, 80) })
+  devLog('Workday option matched')
 
   control = resolve()
   const controlBeforeSelection = control
   const textBeforeSelection = control ? selectedText(control) : ''
   const wasExpanded = control?.getAttribute('aria-expanded') === 'true'
 
+  if (userEdited(field)) return failed('You edited this dropdown; selection stopped.')
   withSyntheticFill(() => {
     clickOption(option)
   })
@@ -370,7 +304,7 @@ async function fillComboboxNow(field: DetectedField, desiredValue: string, timeo
 
 async function waitForSkillOption(
   doc: Document,
-  control: HTMLElement,
+  resolve: () => HTMLElement | null,
   desired: string,
   timeoutMs: number,
 ): Promise<HTMLElement | null> {
@@ -378,7 +312,7 @@ async function waitForSkillOption(
   await waitFor(
     doc,
     () => {
-      const options = queryOptions(doc, control)
+      const options = queryOptions(doc, resolve())
       const index = matchWorkdaySkillOption(options.map(optionText), desired)
       matched = index == null ? null : options[index] ?? null
       return matched != null
@@ -394,10 +328,14 @@ interface ControlLocator {
   name: string
   ariaLabel: string
   ariaLabelledby: string
+  section?: DetectedField['repeatedSection']
+  accessibleName: string
 }
 
-function controlLocator(el: HTMLElement): ControlLocator {
+function controlLocator(el: HTMLElement, field: DetectedField): ControlLocator {
   return {
+    section: field.repeatedSection ?? findWorkdayRepeatedSection(el) ?? undefined,
+    accessibleName: ariaText(el) || labelForControl(el) || field.label,
     id: el.id,
     automationId: el.getAttribute('data-automation-id') || '',
     name: el.getAttribute('name') || '',
@@ -407,6 +345,13 @@ function controlLocator(el: HTMLElement): ControlLocator {
 }
 
 function resolveControl(doc: Document, locator: ControlLocator, fallback: HTMLElement): HTMLElement | null {
+  if (fallback.isConnected && workdayVisible(fallback)) return fallback
+  const section = locator.section
+  const scope = section
+    ? Array.from(doc.querySelectorAll<HTMLElement>('[role="combobox"]')).filter((el) =>
+        findWorkdayRepeatedSection(el)?.sectionKey === section.sectionKey)
+    : Array.from(doc.querySelectorAll<HTMLElement>('[role="combobox"]'))
+  const candidates = scope.filter(workdayVisible)
   const selectors: string[] = []
   if (locator.id) selectors.push(`#${cssEscape(locator.id)}`)
   if (locator.automationId) selectors.push(`[data-automation-id="${cssEscape(locator.automationId)}"][role="combobox"]`)
@@ -414,10 +359,11 @@ function resolveControl(doc: Document, locator: ControlLocator, fallback: HTMLEl
   if (locator.ariaLabel) selectors.push(`[aria-label="${cssEscape(locator.ariaLabel)}"][role="combobox"]`)
   if (locator.ariaLabelledby) selectors.push(`[aria-labelledby="${cssEscape(locator.ariaLabelledby)}"][role="combobox"]`)
   for (const selector of selectors) {
-    const found = doc.querySelector(selector)
-    if (found instanceof HTMLElement) return found
+    const found = candidates.filter((candidate) => candidate.matches(selector))
+    if (found.length === 1) return found[0]!
   }
-  return fallback.isConnected ? fallback : null
+  const named = candidates.filter((el) => locator.accessibleName && (ariaText(el) || labelForControl(el)) === locator.accessibleName)
+  return named.length === 1 ? named[0]! : null
 }
 
 function editableFor(control: HTMLElement | null): HTMLInputElement | HTMLTextAreaElement | null {
@@ -490,12 +436,12 @@ function selectedText(control: HTMLElement): string {
   )
 }
 
-async function waitForOptions(doc: Document, control: HTMLElement | null, timeoutMs: number): Promise<HTMLElement[]> {
+async function waitForOptions(doc: Document, resolve: () => HTMLElement | null, timeoutMs: number): Promise<HTMLElement[]> {
   let found: HTMLElement[] = []
   await waitFor(
     doc,
     () => {
-      found = queryOptions(doc, control)
+      found = queryOptions(doc, resolve())
       return found.length > 0
     },
     timeoutMs,
@@ -511,17 +457,17 @@ function queryOptions(doc: Document, control: HTMLElement | null): HTMLElement[]
   const scoped: HTMLElement[] = []
   for (const id of controlledIds) {
     const listbox = doc.getElementById(id)
-    if (!listbox) continue
+    if (!listbox || listbox.getAttribute('aria-busy') === 'true') continue
     listbox.querySelectorAll('[role="option"], [data-automation-id="promptOption"]').forEach((el) => {
       if (el instanceof HTMLElement) scoped.push(el)
     })
   }
-  if (controlledIds.length) return unique(scoped).filter((option) => optionText(option).length > 0)
+  if (controlledIds.length) return unique(scoped).filter((option) => workdayVisible(option) && option.getAttribute('aria-disabled') !== 'true' && optionText(option).length > 0)
   return unique(
     Array.from(doc.querySelectorAll('[role="listbox"] [role="option"], [role="option"][data-automation-id], [data-automation-id="promptOption"]')).filter(
       (el): el is HTMLElement => el instanceof HTMLElement,
     ),
-  ).filter((option) => optionText(option).length > 0)
+  ).filter((option) => workdayVisible(option) && option.getAttribute('aria-disabled') !== 'true' && optionText(option).length > 0)
 }
 
 function unique(elements: HTMLElement[]): HTMLElement[] {
@@ -562,3 +508,5 @@ function failedSkills(message: string, requested: number, filled: number, skippe
   devLog('Workday multi-value skills fill stopped', { requested, filled, skipped })
   return { ok: false, status: 'failed', message, requested, filled, skipped }
 }
+
+function userEdited(field: DetectedField): boolean { return field.status === 'manual' }

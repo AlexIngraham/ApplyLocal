@@ -1,10 +1,11 @@
+import { devLog } from '@/utils/logging'
+import { getWorkdaySections, findWorkdayRepeatedSection, workdayVisible } from '@/adapters/workdaySections'
 import type { ATSAdapter } from '@/adapters/types'
 import { fillControl } from '@/content/filler'
 import { scanControls } from '@/content/scanControls'
 import {
   fillWorkdayCombobox,
   fillWorkdayMultiValueCombobox,
-  findWorkdayRepeatedSection,
   isWorkdayDom,
   isWorkdayMultiValueSkillsField,
   workdayHintFor,
@@ -22,7 +23,12 @@ export const workdayAdapter: ATSAdapter = {
     return isWorkdayDom(root)
   },
   scan(root, ctx) {
-    const fields = scanControls(root, ctx, this.id, workdayHintFor, findWorkdayRepeatedSection)
+    const doc = root instanceof Document ? root : root.ownerDocument ?? document
+    const sections = getWorkdaySections(doc)
+    const sectionFor = (el: HTMLElement) => findWorkdayRepeatedSection(el, sections)
+    const fields = scanControls(root, ctx, this.id, (el) => workdayHintFor(el, sectionFor), sectionFor)
+      .filter((field) => workdayVisible(field.control.elements[0]!))
+    devLog('Workday scan reconciled', { sections: sections.length, controls: fields.length })
     for (const field of fields) {
       if (isWorkdayMultiValueSkillsField(field)) field.control.multiValue = true
     }

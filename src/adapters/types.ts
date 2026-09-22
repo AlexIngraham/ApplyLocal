@@ -74,5 +74,6 @@ export interface AdapterHint {
 }
 
 export interface RepeatedSectionMatch extends RepeatedSectionContext {
+  confidence?: number
   container: HTMLElement
 }
