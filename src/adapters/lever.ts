@@ -1,5 +1,6 @@
 import type { AdapterHint, ATSAdapter } from '@/adapters/types'
 import { fillControl } from '@/content/filler'
+import { fillSkillsWidget } from '@/content/skills/fill'
 import { scanControls } from '@/content/scanControls'
 
 const EXACT: Record<string, AdapterHint> = {
@@ -33,6 +34,7 @@ export const leverAdapter: ATSAdapter = {
     return scanControls(root, ctx, this.id, (el) => EXACT[el.getAttribute('name') || ''] ?? null)
   },
   fill(field, value) {
+    if (field.canonical === 'skills') return fillSkillsWidget(field, value)
     return fillControl(field, value)
   },
 }

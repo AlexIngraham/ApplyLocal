@@ -30,6 +30,10 @@ const companyReject: Reject = (tokens) => tokens.includes('email') || tokens.inc
 
 const TOKEN_RULES: SeqRule[] = [
   seq('preferredName', 'preferred name', 0.97),
+  seq('preferredName', 'preferred first name', 0.98),
+  seq('preferredName', 'preferred given name', 0.98),
+  seq('preferredName', 'name you go by', 0.97),
+  seq('preferredName', 'what name do you prefer', 0.97),
   seq('preferredName', 'chosen name', 0.96),
   seq('preferredName', 'nickname', 0.95),
   seq('firstName', 'legal first name', 0.98),
@@ -238,7 +242,8 @@ export function matchTokenRules(tokens: string[], text: string, mode: 'strict' |
       key: rule.key,
       confidence,
       reason: `“${rule.label}”`,
-      specificity: rule.sequence.length,
+      // Explicit preferred-name wording outranks broad identity/autocomplete and ATS hints (5).
+      specificity: rule.key === 'preferredName' ? 6 : rule.sequence.length,
     }
     const current = best.get(rule.key)
     if (

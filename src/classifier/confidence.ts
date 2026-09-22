@@ -3,7 +3,7 @@ import type { Settings } from '@/settings/types'
 
 export type FieldPlan = 'autofill' | 'review' | 'skip' | 'ignore'
 export type FillBand = 'high' | 'review' | 'blocked' | 'none'
-export type ControlKind = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'file' | 'custom' | 'combobox'
+export type ControlKind = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'file' | 'custom' | 'combobox' | 'skills-checkboxes'
 
 export interface PlanInput {
   key: CanonicalField

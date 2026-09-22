@@ -17,6 +17,10 @@ export interface ControlHandle {
   kind: ControlKind
   inputType: string
   multiValue?: boolean
+  skillsWidget?: {
+    kind: 'checkbox-list' | 'searchable-checkbox-list'
+    resolve: () => HTMLElement | null
+  }
 }
 
 export interface DetectedField {
@@ -48,6 +52,16 @@ export interface FillResult {
   filled?: number
   skipped?: number
   needsReview?: boolean
+  skills?: SkillsFillDetails
+}
+
+export interface SkillsFillDetails {
+  requested: number
+  filled: string[]
+  alreadySelected: string[]
+  unavailable: string[]
+  ambiguous: string[]
+  failed: string[]
 }
 
 export type FillOutcome = FillResult | Promise<FillResult>

@@ -1,5 +1,6 @@
 import type { AdapterHint, ATSAdapter } from '@/adapters/types'
 import { fillControl } from '@/content/filler'
+import { fillSkillsWidget } from '@/content/skills/fill'
 import { scanControls } from '@/content/scanControls'
 
 function hintFrom(el: Element, table: Array<[RegExp, AdapterHint]>): AdapterHint | null {
@@ -38,6 +39,7 @@ export const greenhouseAdapter: ATSAdapter = {
     return scanControls(root, ctx, this.id, (el) => hintFrom(el, GREENHOUSE_HINTS))
   },
   fill(field, value) {
+    if (field.canonical === 'skills') return fillSkillsWidget(field, value)
     return fillControl(field, value)
   },
 }

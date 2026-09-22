@@ -1,4 +1,5 @@
 import { watchWorkdaySections, workdayVisible } from '@/adapters/workdaySections'
+import { skillWidgetRoot } from '@/adapters/workdayDom'
 import { ariaText, labelForControl } from '@/utils/dom'
 import type { CanonicalField } from '@/classifier/types'
 import type { DetectedField } from '@/adapters/types'
@@ -8,6 +9,7 @@ import { selectAdapter } from '@/adapters/registry'
 import { scanDocument } from '@/content/scanner'
 import { applyDetectedFields, fillOne, undoField } from '@/content/apply'
 import { observeAdditions } from '@/content/mutationObserver'
+import { fillInProgress, FILL_SETTLED_EVENT } from '@/content/fillTransaction'
 import { summarize } from '@/content/summary'
 import { isSyntheticFill } from '@/utils/events'
 import { devLog } from '@/utils/logging'
@@ -40,6 +42,7 @@ export function startController(doc: Document, win: Window): () => void {
   let stopObserver: (() => void) | null = null
   let ats: AtsId = 'generic'
   let started = false
+  let pendingRescan = false
   const currentUrl = () => win.location.href
 
   const ready = (async () => {
@@ -75,6 +78,14 @@ export function startController(doc: Document, win: Window): () => void {
   chrome.storage.onChanged.addListener(onStorage)
   doc.addEventListener('input', onUserEdit, true)
   doc.addEventListener('change', onUserEdit, true)
+  doc.addEventListener('click', onSkillClick, true)
+  doc.addEventListener(FILL_SETTLED_EVENT, onFillSettled)
+
+  function onFillSettled() {
+    if (!started || !pendingRescan) return
+    pendingRescan = false
+    refresh()
+  }
 
   function hello() {
     try {
@@ -112,6 +123,7 @@ export function startController(doc: Document, win: Window): () => void {
     if (settings.autoFillHighConfidence) void applyDetectedFields(fields, 'auto').then(paint)
     paint()
     stopObserver = observeAdditions(doc, (nodes) => {
+      if (fillInProgress(doc)) { pendingRescan = true; return }
       for (const node of nodes) rescan(node)
       if (settings?.autoFillHighConfidence) void applyDetectedFields(fields, 'auto').then(paint)
       paint()
@@ -121,6 +133,8 @@ export function startController(doc: Document, win: Window): () => void {
   }
 
   function deactivate() {
+    for (const field of fields) { field.status = 'manual'; field.locked = true }
+    pendingRescan = false
     stopSections?.()
     stopSections = null
     stopObserver?.()
@@ -132,6 +146,7 @@ export function startController(doc: Document, win: Window): () => void {
   }
 
   function refresh() {
+    if (fillInProgress(doc)) { pendingRescan = true; return }
     rescan(doc)
     if (settings?.autoFillHighConfidence) void applyDetectedFields(fields, 'auto').then(paint)
     paint()
@@ -211,8 +226,10 @@ export function startController(doc: Document, win: Window): () => void {
     const target = event.target
     if (!(target instanceof HTMLElement)) return
     let field = byElement.get(target)
+    if (!field) field = fields.find((item) => item.control.skillsWidget?.resolve()?.contains(target) ||
+      (item.canonical === 'skills' && item.control.multiValue && item.control.elements[0] && skillWidgetRoot(item.control.elements[0]).contains(target)))
     // A user can type into a React replacement before the debounced rescan fires.
-    if (!field && started && target.matches('input, textarea, select, [role="combobox"]')) {
+    if (!field && started && target.matches('input, textarea, select, [role="combobox"], [role="checkbox"]')) {
       rescan(doc)
       field = byElement.get(target)
     }
@@ -222,6 +239,13 @@ export function startController(doc: Document, win: Window): () => void {
     field.planReason = 'You edited this field, so ApplyLocal will leave it alone.'
     manuallyEdited.add(fieldKey(field))
     paint()
+  }
+
+  function onSkillClick(event: Event) {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (target.closest('input[type="checkbox"], [role="checkbox"]') ||
+      target.closest('button[aria-label^="Remove" i], button[aria-label^="Delete" i]')) onUserEdit(event)
   }
 
   async function neverAutofill(canonical: CanonicalField) {
@@ -264,6 +288,7 @@ export function startController(doc: Document, win: Window): () => void {
     if (!started) activate()
     if (message.type === 'al:scan') refresh()
     if (message.type === 'al:autofill') {
+      if (fillInProgress(doc)) { pendingRescan = true; return snapshot() }
       rescan(doc)
       await applyDetectedFields(fields, 'page')
       paint()
@@ -281,7 +306,9 @@ export function startController(doc: Document, win: Window): () => void {
   }
 
   function toModel(field: DetectedField): IndicatorModel {
-    const anchor = field.control.elements[0] as HTMLElement
+    const control = field.control.elements[0] as HTMLElement
+    const heading = field.control.skillsWidget && Array.from(control.children).find((child) => child.matches('legend, h1, h2, h3, h4, [role="heading"]'))
+    const anchor = heading instanceof HTMLElement ? heading : control
     return {
       id: field.id,
       status: field.status,
@@ -321,6 +348,8 @@ export function startController(doc: Document, win: Window): () => void {
     deactivate()
     doc.removeEventListener('input', onUserEdit, true)
     doc.removeEventListener('change', onUserEdit, true)
+    doc.removeEventListener('click', onSkillClick, true)
+    doc.removeEventListener(FILL_SETTLED_EVENT, onFillSettled)
     chrome.runtime.onMessage.removeListener(onMessage)
     chrome.storage.onChanged.removeListener(onStorage)
   }

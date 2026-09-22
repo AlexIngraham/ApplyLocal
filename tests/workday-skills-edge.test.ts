@@ -80,3 +80,15 @@ it('reacquires a repeated combobox inside its own card rather than the first mat
   expect(replacement.value).toBe('A.S.')
   expect(document.querySelector<HTMLInputElement>('[aria-controls="one"]')!.value).toBe('')
 })
+
+it('does not clear a manual edit made while a skill option is pending', async () => {
+  const { fields } = scanFixture('workday-skills.html', 'https://acme.myworkdayjobs.com/job/1')
+  const field = fieldById(fields, 'workday-skills')!
+  const input = document.getElementById('workday-skills') as HTMLInputElement
+  document.getElementById('skills-list')!.innerHTML = ''
+  const task = fillWorkdayMultiValueCombobox(field, ['SQL', 'Python'], 60)
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  field.status = 'manual'; input.value = 'My correction'
+  await task
+  expect(input.value).toBe('My correction')
+})

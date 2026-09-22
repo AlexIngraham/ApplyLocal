@@ -2,6 +2,9 @@ import { workdayVisible } from '@/adapters/workdaySections'
 import type { DetectedField, FillOutcome, FillResult } from '@/adapters/types'
 import { isControlEmpty, readControl, restoreControl } from '@/content/filler'
 import { getAdapter } from '@/adapters/registry'
+import { beginFill } from '@/content/fillTransaction'
+
+const pendingFields = new WeakMap<DetectedField, Promise<FillResult>>()
 
 export function applyDetectedFields(fields: DetectedField[], mode: 'auto' | 'page'): Promise<void> {
   const pending: Promise<FillResult>[] = []
@@ -40,14 +43,29 @@ export function undoField(field: DetectedField): void {
 }
 
 function writeField(field: DetectedField): FillOutcome {
+  const pending = pendingFields.get(field)
+  if (pending) return pending
   if (!field.control.elements[0] || !workdayVisible(field.control.elements[0])) return { ok: false, status: 'skipped', message: 'This control is no longer active.' }
   field.previousValue = field.control.multiValue ? null : readControl(field)
   field.locked = true
-  const result = getAdapter(field.adapterId).fill(field, field.proposedValue ?? '')
-  if (result instanceof Promise) {
-    return result.then((settled) => updateResult(field, settled))
+  const end = beginFill(field.control.elements[0]!.ownerDocument)
+  try {
+    const result = getAdapter(field.adapterId).fill(field, field.proposedValue ?? '')
+    if (result instanceof Promise) {
+      const task = result.catch((): FillResult => ({ ok: false, status: 'failed', message: 'The page changed before filling finished.' }))
+        .then((settled) => updateResult(field, settled))
+        .finally(() => { pendingFields.delete(field); end() })
+      pendingFields.set(field, task)
+      return task
+    }
+    const settled = updateResult(field, result)
+    end()
+    return settled
+  } catch {
+    const settled = updateResult(field, { ok: false, status: 'failed', message: 'The page changed before filling finished.' })
+    end()
+    return settled
   }
-  return updateResult(field, result)
 }
 
 function updateResult(field: DetectedField, result: FillResult): FillResult {

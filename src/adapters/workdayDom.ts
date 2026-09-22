@@ -7,6 +7,8 @@ import { matchChoice } from '@/content/matchers'
 import { ariaText, cleanText, cssEscape, describedBy, groupQuestion, labelForControl, previousPrompt } from '@/utils/dom'
 import { withSyntheticFill } from '@/utils/events'
 import { devLog } from '@/utils/logging'
+import { normalizeSkill } from '@/content/skills/matching'
+import { yieldSkillsDom } from '@/content/skills/scheduling'
 
 const WORKDAY_ROOT_MARKERS = [
   '[data-automation-id="applicationPage"]',
@@ -17,10 +19,10 @@ const WORKDAY_ROOT_MARKERS = [
 ]
 
 const HINTS: Array<[RegExp, AdapterHint]> = [
+  [/\b(preferred (first |given )?name|preferredname|chosen name|name you go by|what name do you prefer|nickname)\b/, hint('preferredName', 'Workday preferred name field')],
   [/\b(first name|firstname)\b/, hint('firstName', 'Workday first name field')],
   [/\b(middle name|middlename|middle initial)\b/, hint('middleName', 'Workday middle name field')],
   [/\b(last name|lastname|family name)\b/, hint('lastName', 'Workday last name field')],
-  [/\b(preferred name|preferredname)\b/, hint('preferredName', 'Workday preferred name field')],
   [/\b(email address|emailaddress|email)\b/, hint('email', 'Workday email field')],
   [/\b(phone extension|phoneextension|telephone extension|extension|ext)\b/, hint('phoneExtension', 'Workday phone extension field')],
   [/\b(phone number|phonenumber|mobile phone)\b/, hint('phone', 'Workday phone field')],
@@ -161,7 +163,14 @@ async function fillMultiValueNow(field: DetectedField, desiredValues: string[], 
   if (!original) return failedSkills('Missing Workday skills picker.', requested, 0, requested)
   const doc = original.ownerDocument
   const locator = controlLocator(original, field)
-  const resolve = () => resolveControl(doc, locator, original)
+  const resolve = () => {
+    const current = resolveControl(doc, locator, original)
+    if (current) {
+      const editor = editableFor(current)
+      field.control.elements = editor && editor !== current ? [current, editor] : [current]
+    }
+    return current
+  }
   let filled = 0
   let skipped = 0
   let alreadySelected = 0
@@ -195,6 +204,7 @@ async function fillMultiValueNow(field: DetectedField, desiredValues: string[], 
     withSyntheticFill(() => typeIntoCombobox(editor, desired))
 
     const option = await waitForSkillOption(doc, resolve, desired, timeoutMs)
+    if (userEdited(field)) { skipped += values.length - index; break }
     if (!option) {
       skipped += 1
       const currentEditor = editableFor(resolve())
@@ -202,8 +212,8 @@ async function fillMultiValueNow(field: DetectedField, desiredValues: string[], 
       devLog('Workday skill option unavailable or ambiguous; skipping')
       continue
     }
-    if (userEdited(field)) { skipped += values.length - index; break }
     withSyntheticFill(() => clickOption(option))
+    await yieldSkillsDom()
     const confirmed = await waitFor(
       doc,
       () => {
@@ -389,10 +399,6 @@ function clickOption(option: HTMLElement): void {
   option.click()
 }
 
-function normalizeSkill(value: string): string {
-  return value.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g, ' ')
-}
-
 function selectedSkillValues(control: HTMLElement): string[] {
   const root = skillWidgetRoot(control)
   const selected = root.querySelectorAll(
@@ -408,7 +414,7 @@ function selectedSkillValues(control: HTMLElement): string[] {
     .filter(Boolean)
 }
 
-function skillWidgetRoot(control: HTMLElement): HTMLElement {
+export function skillWidgetRoot(control: HTMLElement): HTMLElement {
   let current = control.parentElement
   while (current && current.tagName !== 'FORM' && current.tagName !== 'BODY') {
     const marker = normalize(

@@ -7,6 +7,7 @@ import { EDUCATION_FIELDS, EMPLOYMENT_FIELDS } from '@/profile/types'
 import { proposedValue, sensitiveBlocked } from '@/profile/resolve'
 import type { AdapterHint, DetectedField, RepeatedSectionContext, ScanContext } from '@/adapters/types'
 import { normalize } from '@/classifier/normalize'
+import { detectCheckboxSkillGroups } from '@/content/skills/dom'
 import {
   ariaText,
   cleanText,
@@ -121,8 +122,21 @@ export function scanControls(
   const repeats = new Map<CanonicalField, number>()
   const fields: DetectedField[] = []
   let seq = 0
+  const allElements = collectElements(root)
+  const skillGroups = detectCheckboxSkillGroups(allElements)
+  for (const group of skillGroups) {
+    const field = buildField([group.root], 'skills-checkboxes', 'checkbox', {
+      key: 'skills', confidence: 0.98, reason: 'Checkbox selector in a labeled skills section',
+    })
+    if (!field) continue
+    field.label = group.label
+    field.control.multiValue = true
+    field.control.skillsWidget = group.widget
+    fields.push(field)
+    group.controls.forEach((el) => seenControls.add(el))
+  }
 
-  for (const el of collectElements(root)) {
+  for (const el of allElements) {
     if (el instanceof HTMLElement && seenControls.has(el)) continue
     const kind = controlKind(el, adapterId)
     if (!kind || !(el instanceof HTMLElement)) continue
@@ -150,7 +164,7 @@ export function scanControls(
 
   return fields
 
-  function buildField(elements: HTMLElement[], kind: ControlKind, inputType: string): DetectedField | null {
+  function buildField(elements: HTMLElement[], kind: ControlKind, inputType: string, hint?: AdapterHint): DetectedField | null {
     const primary = elements[0]
     if (!primary) return null
     const extracted = signalsFor(elements, kind)
@@ -160,7 +174,7 @@ export function scanControls(
       signals: extracted.signals,
       controlType: inputType,
       section,
-      adapterHint: hintFor?.(primary) ?? null,
+      adapterHint: hint ?? hintFor?.(primary) ?? null,
     })
     const detectedSection = REPEATING.has(classification.key) ? repeatedSectionFor?.(primary) ?? null : null
     const repeatedSection = sectionMatchesField(detectedSection, classification.key) ? detectedSection ?? undefined : undefined

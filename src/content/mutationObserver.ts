@@ -6,7 +6,7 @@ export function observeAdditions(doc: Document, onAdded: (nodes: ParentNode[]) =
   let pending: ParentNode[] = []
   let timer = 0
   let url = win.location.href
-  const relevant = 'input, select, textarea, [role="combobox"], h1, h2, h3, h4, [role="heading"], legend'
+  const relevant = 'input, select, textarea, [role="combobox"], [role="checkbox"], h1, h2, h3, h4, [role="heading"], legend'
   const own = (node: Node) => node instanceof Element && (node.id.startsWith('applylocal') || Boolean(node.closest('[id^="applylocal"]')))
   const containsControls = (node: Node) => node instanceof Element && !own(node) && (node.matches(relevant) || Boolean(node.querySelector(relevant)))
   function schedule() {

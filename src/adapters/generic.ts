@@ -1,5 +1,6 @@
 import type { ATSAdapter } from '@/adapters/types'
 import { fillControl } from '@/content/filler'
+import { fillSkillsWidget } from '@/content/skills/fill'
 import { scanControls } from '@/content/scanControls'
 
 export const genericAdapter: ATSAdapter = {
@@ -12,6 +13,7 @@ export const genericAdapter: ATSAdapter = {
     return scanControls(root, ctx, this.id)
   },
   fill(field, value) {
+    if (field.canonical === 'skills') return fillSkillsWidget(field, value)
     return fillControl(field, value)
   },
 }

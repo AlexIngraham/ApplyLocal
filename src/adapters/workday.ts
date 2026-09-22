@@ -2,6 +2,7 @@ import { devLog } from '@/utils/logging'
 import { getWorkdaySections, findWorkdayRepeatedSection, workdayVisible } from '@/adapters/workdaySections'
 import type { ATSAdapter } from '@/adapters/types'
 import { fillControl } from '@/content/filler'
+import { fillSkillsWidget } from '@/content/skills/fill'
 import { scanControls } from '@/content/scanControls'
 import {
   fillWorkdayCombobox,
@@ -35,9 +36,7 @@ export const workdayAdapter: ATSAdapter = {
     return fields
   },
   fill(field, value) {
-    if (field.control.kind === 'combobox' && field.control.multiValue && Array.isArray(value)) {
-      return fillWorkdayMultiValueCombobox(field, value)
-    }
+    if (field.canonical === 'skills') return fillSkillsWidget(field, value, fillWorkdayMultiValueCombobox)
     if (field.control.kind === 'combobox' && typeof value === 'string') {
       const formatted = dateCandidatesForControl(field, value)
       if (formatted && !formatted.length) {

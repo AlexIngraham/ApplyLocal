@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ApplyLocal preferred name and skills QA</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 850px; margin: 32px auto; padding: 0 24px; color: #222; }
+    fieldset { margin: 24px 0; padding: 20px; border: 1px solid #aaa; }
+    legend { font-weight: 600; }
+    .options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    label { display: block; }
+    input[type=text], input[type=search], textarea { display: block; padding: 8px; margin: 5px 0 14px; }
+    input[type=checkbox] { margin-right: 8px; }
+    output { display: block; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>Preferred name and skills</h1>
+  <p>Save a distinct legal first name and preferred name. For skills, use TypeScript, React, Python, SQL, AWS, and FastAPI. Open the extension popup to scan this local page.</p>
+  <p>Java and React start selected to test preservation. FastAPI is intentionally unavailable. Each large-list selection replaces the entire fieldset. Search results arrive after 250 ms.</p>
+  <form onsubmit="event.preventDefault()">
+    <fieldset><legend>Names</legend>
+      <label>Legal First Name<input type="text" name="first_name"></label>
+      <label>Preferred Name<input type="text" name="preferred_name"></label>
+      <label>Preferred First Name<input type="text" name="firstName" autocomplete="given-name"></label>
+    </fieldset>
+    <label>List your technical skills<textarea rows="3"></textarea></label>
+    <p>The ordinary textarea may show a suggestion at the default confidence threshold; use its indicator’s Fill action.</p>
+    <fieldset id="large-skills"><legend>Select all skills that apply</legend></fieldset>
+    <fieldset id="search-skills"><legend>Searchable skills</legend>
+      <label>Search skills<input type="search" aria-label="Search skills"></label>
+      <output id="search-selected" aria-live="polite"></output>
+      <div class="options"></div>
+    </fieldset>
+    <fieldset><legend>Agreements</legend><label><input type="checkbox">I agree to terms</label></fieldset>
+  </form>
+  <p><a href="./workday.html">Also test the existing Workday chip demo</a> · <a href="./index.html">All demos</a></p>
+  <script>
+    const technologies = ['Java', 'JavaScript', 'TypeScript', 'React', 'React Native', 'Python', 'SQL', 'AWS', 'C', 'C++', 'C#'];
+    const largeChoices = [...technologies, ...Array.from({ length: 189 }, (_, i) => `Other technology ${i + 1}`)];
+    const largeSelected = new Set(['Java', 'React']);
+    const searchSelected = new Set(['Java', 'React']);
+    function option(value, selected, changed) {
+      const label = document.createElement('label');
+      const box = document.createElement('input'); box.type = 'checkbox'; box.value = value; box.checked = selected.has(value);
+      box.addEventListener('click', () => { if (box.checked) selected.add(value); else selected.delete(value); changed(); });
+      label.append(box, value); return label;
+    }
+    function renderLarge() {
+      const next = document.createElement('fieldset'); next.id = 'large-skills';
+      const legend = document.createElement('legend'); legend.textContent = 'Select all skills that apply'; next.append(legend);
+      const count = document.createElement('p'); count.textContent = `${largeSelected.size} selected from 200 options`; next.append(count);
+      const options = document.createElement('div'); options.className = 'options';
+      for (const value of largeChoices) options.append(option(value, largeSelected, () => setTimeout(renderLarge, 0)));
+      next.append(options); document.getElementById('large-skills').replaceWith(next);
+    }
+    const searchRoot = document.getElementById('search-skills');
+    const search = searchRoot.querySelector('input[type=search]');
+    const results = searchRoot.querySelector('.options');
+    function renderSearch() {
+      results.replaceChildren();
+      for (const value of technologies.filter(value => value.toLowerCase().includes(search.value.toLowerCase()))) {
+        results.append(option(value, searchSelected, renderSearch));
+      }
+      results.removeAttribute('aria-busy');
+      document.getElementById('search-selected').textContent = `Selected: ${[...searchSelected].join(', ')}`;
+    }
+    let timer;
+    search.addEventListener('input', () => {
+      clearTimeout(timer); results.setAttribute('aria-busy', 'true');
+      timer = setTimeout(renderSearch, 250);
+    });
+    renderLarge(); renderSearch();
+  </script>
+</body>
+</html>

@@ -39,12 +39,15 @@ export function formatForControl(value: string, inputType: string): string | nul
 }
 
 export function fillControl(field: DetectedField, value: ProposedValue): FillResult {
+  if (Array.isArray(value) && field.control.kind !== 'text' && field.control.kind !== 'textarea') {
+    return { ok: false, status: 'skipped', message: 'Multi-value answers require a supported widget.' }
+  }
   return withSyntheticFill(() => fillControlInner(field, Array.isArray(value) ? value.join(', ') : value))
 }
 
 function fillControlInner(field: DetectedField, value: string): FillResult {
   const { control } = field
-  if (control.kind === 'file' || control.kind === 'custom' || control.kind === 'combobox') {
+  if (control.kind === 'file' || control.kind === 'custom' || control.kind === 'combobox' || control.kind === 'skills-checkboxes') {
     return { ok: false, status: 'skipped', message: 'This control is left for you to complete.' }
   }
   if (control.kind === 'select') {
@@ -121,6 +124,8 @@ export function readControl(field: DetectedField): string {
 }
 
 export function isControlEmpty(field: DetectedField): boolean {
+  // Skills checkboxes are additive; preselected options do not block new matches.
+  if (field.control.skillsWidget) return true
   const el = field.control.elements[0]
   if (field.control.kind === 'select' && el instanceof HTMLSelectElement) {
     if (!el.value) return true
