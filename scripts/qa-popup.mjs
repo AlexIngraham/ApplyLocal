@@ -45,7 +45,7 @@ async function noOverflow() {
 }
 try {
   await send('Page.enable'); await send('Runtime.enable')
-  await send('Emulation.setDeviceMetricsOverride', { width: 410, height: 600, deviceScaleFactor: 1, mobile: false })
+  await send('Emulation.setDeviceMetricsOverride', { width: 220, height: 160, deviceScaleFactor: 1, mobile: false })
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.__writes = []; window.__commands = []; window.__fail = false;
     const data = { profile: { personal: { firstName: 'Alex', lastName: 'Morgan', email: 'alex@example.com', phone: '555-0123' }, education: [{ id: 'edu-1', school: 'Northeastern University', degree: 'Bachelor of Science', major: 'Computer Science', minor: '', startDate: '2022-09', graduationDate: '2026-05', gpa: '3.8' }], employment: Array.from({length: 6}, (_, i) => ({ id: 'job-'+i, company: i ? 'Example Company '+i : 'Ipsos MMA', jobTitle: i ? 'Software Engineer' : 'Software Engineer Intern', startDate: '2026-05', endDate: '2026-08', current: false, location: 'New York, NY', description: 'Built internal tools.' })), skills: ['TypeScript', 'React', 'Python'] }, applications: [] };
@@ -53,6 +53,13 @@ try {
     window.chrome = { storage: { local: { get: async () => data, set: async v => { if (window.__fail) throw Error('Storage unavailable'); window.__writes.push(v); Object.assign(data, v) } }, session: { get: async () => ({ 'al-frame:1:0': { tabId: 1, frameId: 0 } }), remove: async () => {} }, onChanged: { addListener() {}, removeListener() {} } }, tabs: { query: async () => [{ id: 1, url: 'https://careers.example.com/apply' }], sendMessage: (id, message, options, callback) => { window.__commands.push(message.type); setTimeout(() => (callback || options)(snapshot), message.type === 'al:autofill' ? 700 : 20) } }, runtime: {}, scripting: { executeScript: async () => {} } };
   ` })
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/src/ui/popup/index.html` }); await wait(450)
+  // Chrome starts an action popup small, then sizes it from its document.
+  // A viewport-dependent root can lock that initial size and collapse the panel.
+  const openingSize = await evaluate(`({ width: document.documentElement.getBoundingClientRect().width, height: document.querySelector('.app').getBoundingClientRect().height, panel: document.querySelector('.panel[data-active="true"]').getBoundingClientRect().height })`)
+  assert.equal(openingSize.width, 410, 'Popup must request its full width even in a small initial viewport')
+  assert.ok(openingSize.height >= 450 && openingSize.height <= 600, 'Popup must grow to show its content')
+  assert.ok(openingSize.panel >= 320, 'Active panel must not collapse during opening')
+  await send('Emulation.setDeviceMetricsOverride', { width: 410, height: Math.ceil(openingSize.height), deviceScaleFactor: 1, mobile: false })
   assert.equal(await evaluate(`document.querySelector('[role="tab"][aria-selected="true"]').textContent`), 'Overview')
   await noOverflow(); await screenshot('overview-410')
   await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Autofill page').click()`)
@@ -71,10 +78,14 @@ try {
   await click('Profile')
   assert.equal(await evaluate(`document.querySelector('#panel-profile').scrollTop`), scroll)
   assert.equal(await evaluate(`[...document.querySelectorAll('.accordion-trigger')].find(b => b.querySelector('strong').textContent === 'Work experience').getAttribute('aria-expanded')`), 'true')
+  // Explicit alternate shell sizes test responsive contents without reintroducing
+  // viewport-dependent sizing into the native action popup.
   for (const width of [380, 430]) {
+    await evaluate(`document.documentElement.style.width = '${width}px'`)
     await send('Emulation.setDeviceMetricsOverride', { width, height: 600, deviceScaleFactor: 1, mobile: false })
     for (const tab of ['Overview', 'Profile', 'Settings']) { await click(tab); await noOverflow() }
   }
+  await evaluate(`document.documentElement.style.width = '380px'`)
   await send('Emulation.setDeviceMetricsOverride', { width: 380, height: 600, deviceScaleFactor: 1, mobile: false })
   await screenshot('settings-380')
   await evaluate(`document.querySelector('#panel-settings').scrollTop = 9999`); await screenshot('backup-380')
@@ -112,7 +123,7 @@ try {
   assert.equal(await evaluate(`document.querySelectorAll('#panel-profile .entry-card').length`), entries - 1)
   assert.equal(await evaluate(`document.activeElement.textContent`), 'Add experience')
   assert.deepEqual(errors, [])
-  console.log(`Built Chrome QA passed: 380/410/430px, overflow, tab/accordion persistence, actions/loading, keyboard switch/navigation, reduced motion. Screenshots: ${artifacts}`)
+  console.log(`Built Chrome QA passed: small-viewport opening, 380/410/430px, overflow, tab/accordion persistence, actions/loading, keyboard switch/navigation, reduced motion. Screenshots: ${artifacts}`)
 } finally {
   await send('Page.close').catch(() => {})
   ws.close(); server.close()
