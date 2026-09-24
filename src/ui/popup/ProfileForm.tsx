@@ -1,3 +1,4 @@
+import { EntryCard } from './components/EntryCard'
 import { Accordion } from './components/Accordion'
 import { Badge, Button, EmptyState, TextInput as Text, Toggle } from './components/ui'
 import { emptyEducation, emptyEmployment } from '@/profile/defaults'
@@ -148,7 +149,7 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
 
 function EducationCard({ entry, index, onChange, onRemove }: { entry: EducationEntry; index: number; onChange: (entry: EducationEntry) => void; onRemove: () => void }) {
   return (
-    <Accordion className="entry-card" title={entry.school || `Education ${index + 1}`} summary={[entry.degree || 'Add degree details', dateRange(entry.startDate, entry.graduationDate)].filter(Boolean).join('\n')} defaultOpen={!entry.school}>
+    <EntryCard onRemove={onRemove} title={entry.school || `Education ${index + 1}`} summary={[entry.degree || 'Add degree details', dateRange(entry.startDate, entry.graduationDate)].filter(Boolean).join('\n')} defaultOpen={!entry.school}>
       <div className="grid">
         <Text label="School" value={entry.school} onChange={(school) => onChange({ ...entry, school })} />
         <Text label="Degree" value={entry.degree} onChange={(degree) => onChange({ ...entry, degree })} />
@@ -158,14 +159,13 @@ function EducationCard({ entry, index, onChange, onRemove }: { entry: EducationE
         <Text label="Graduation" type="month" value={entry.graduationDate} onChange={(graduationDate) => onChange({ ...entry, graduationDate })} />
         <Text label="GPA" value={entry.gpa} onChange={(gpa) => onChange({ ...entry, gpa })} />
       </div>
-      <Button variant="danger" icon="trash" className="entry-remove" onClick={onRemove}>Remove entry</Button>
-    </Accordion>
+    </EntryCard>
   )
 }
 
 function EmploymentCard({ entry, index, onChange, onRemove }: { entry: EmploymentEntry; index: number; onChange: (entry: EmploymentEntry) => void; onRemove: () => void }) {
   return (
-    <Accordion className="entry-card" title={entry.jobTitle || `Experience ${index + 1}`} summary={[entry.company || 'Add company details', dateRange(entry.startDate, entry.current ? 'Present' : entry.endDate)].filter(Boolean).join('\n')} defaultOpen={!entry.company}>
+    <EntryCard onRemove={onRemove} title={entry.jobTitle || `Experience ${index + 1}`} summary={[entry.company || 'Add company details', dateRange(entry.startDate, entry.current ? 'Present' : entry.endDate)].filter(Boolean).join('\n')} defaultOpen={!entry.company}>
       <div className="grid">
         <Text label="Company" value={entry.company} onChange={(company) => onChange({ ...entry, company })} />
         <Text label="Job title" value={entry.jobTitle} onChange={(jobTitle) => onChange({ ...entry, jobTitle })} />
@@ -178,8 +178,7 @@ function EmploymentCard({ entry, index, onChange, onRemove }: { entry: Employmen
         </label>
         <div className="wide"><Toggle label="Current position" checked={entry.current} onChange={(current) => onChange({ ...entry, current })} /></div>
       </div>
-      <Button variant="danger" icon="trash" className="entry-remove" onClick={onRemove}>Remove entry</Button>
-    </Accordion>
+    </EntryCard>
   )
 }
 

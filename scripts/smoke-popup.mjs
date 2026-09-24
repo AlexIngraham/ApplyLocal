@@ -19,7 +19,7 @@ try {
   if (!script) throw new Error('Missing popup script')
   window.eval(await readFile(join(root, dirname(manifest.action.default_popup), script), 'utf8'))
   await new Promise((resolve) => setTimeout(resolve, 100))
-  const settings = [...window.document.querySelectorAll('nav button')].find((button) => button.textContent === 'settings')
+  const settings = [...window.document.querySelectorAll('nav button')].find((button) => button.textContent === 'Settings')
   if (!settings) throw new Error('Popup failed to boot')
   settings.click()
   await new Promise((resolve) => setTimeout(resolve, 50))
