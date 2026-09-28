@@ -67,16 +67,19 @@ describe('controlled inputs', () => {
     const input = document.createElement('input')
     document.body.append(input)
     const seen: string[] = []
-    const tracker: string[] = []
-    ;(input as HTMLInputElement & { _valueTracker?: { setValue: (value: string) => void } })._valueTracker = {
-      setValue: (value) => tracker.push(value),
-    }
+    const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!
+    let instanceWrites = 0
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get() { return native.get!.call(this) },
+      set(value: string) { instanceWrites += 1; native.set!.call(this, value) },
+    })
     input.addEventListener('input', () => seen.push('input'))
     input.addEventListener('change', () => seen.push('change'))
     setNativeValue(input, 'Jordan')
     expect(input.value).toBe('Jordan')
     expect(seen).toEqual(['input', 'change'])
-    expect(tracker).toHaveLength(1)
+    expect(instanceWrites).toBe(0)
     input.remove()
   })
 })

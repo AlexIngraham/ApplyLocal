@@ -4,8 +4,9 @@ import { genericAdapter } from '@/adapters/generic'
 import { greenhouseAdapter } from '@/adapters/greenhouse'
 import { leverAdapter } from '@/adapters/lever'
 import { workdayAdapter } from '@/adapters/workday'
+import { ashbyAdapter } from '@/adapters/ashby'
 
-const SITE_ADAPTERS = [workdayAdapter, greenhouseAdapter, leverAdapter]
+const SITE_ADAPTERS = [workdayAdapter, greenhouseAdapter, leverAdapter, ashbyAdapter]
 
 export function selectAdapter(url: string, root: ParentNode, settings: Settings): ATSAdapter {
   if (!settings.enableSiteAdapters) return genericAdapter
@@ -19,4 +20,4 @@ export function getAdapter(id: string): ATSAdapter {
   return [...SITE_ADAPTERS, genericAdapter].find((adapter) => adapter.id === id) ?? genericAdapter
 }
 
-export { genericAdapter, greenhouseAdapter, leverAdapter, workdayAdapter }
+export { genericAdapter, greenhouseAdapter, leverAdapter, workdayAdapter, ashbyAdapter }

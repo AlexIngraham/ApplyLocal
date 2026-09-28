@@ -1,9 +1,10 @@
-export type AtsId = 'greenhouse' | 'lever' | 'workday' | 'generic'
+export type AtsId = 'greenhouse' | 'lever' | 'workday' | 'ashby' | 'generic'
 
 export const ATS_LABELS: Record<AtsId, string> = {
   greenhouse: 'Greenhouse',
   lever: 'Lever',
   workday: 'Workday',
+  ashby: 'Ashby',
   generic: 'Generic form',
 }
 
@@ -30,9 +31,15 @@ export function isWorkdayUrl(url: string): boolean {
   return host === 'myworkdayjobs.com' || host.endsWith('.myworkdayjobs.com')
 }
 
+export function isAshbyUrl(url: string): boolean {
+  const host = hostnameOf(url)
+  return host === 'ashbyhq.com' || host.endsWith('.ashbyhq.com')
+}
+
 export function detectAtsFromUrl(url: string): AtsId {
   if (isGreenhouseUrl(url)) return 'greenhouse'
   if (isLeverUrl(url)) return 'lever'
   if (isWorkdayUrl(url)) return 'workday'
+  if (isAshbyUrl(url)) return 'ashby'
   return 'generic'
 }

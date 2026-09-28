@@ -121,7 +121,9 @@ function combine(snapshots: ScanSnapshot[], url: string): Pick<PageState, 'ats' 
       ? 'greenhouse'
       : snapshots.some((item) => item.ats === 'lever')
         ? 'lever'
-        : detectAtsFromUrl(url)
+        : snapshots.some((item) => item.ats === 'ashby')
+          ? 'ashby'
+          : detectAtsFromUrl(url)
   const fields = snapshots.flatMap((item, index) =>
     item.fields.map((field) => ({ ...field, id: `${index}-${field.id}` })),
   )

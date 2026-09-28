@@ -13,8 +13,11 @@ export function withSyntheticFill<T>(fn: () => T): T {
   }
 }
 
-export function dispatchValueEvents(el: HTMLElement): void {
-  el.dispatchEvent(new Event('input', { bubbles: true }))
-  el.dispatchEvent(new Event('change', { bubbles: true }))
-  el.dispatchEvent(new FocusEvent('blur', { bubbles: true }))
+export function dispatchValueEvents(el: HTMLElement, text?: string): void {
+  const win = el.ownerDocument.defaultView ?? window
+  const input = text !== undefined && typeof win.InputEvent === 'function'
+    ? new win.InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: text })
+    : new win.Event('input', { bubbles: true, composed: true })
+  el.dispatchEvent(input)
+  el.dispatchEvent(new win.Event('change', { bubbles: true, composed: true }))
 }

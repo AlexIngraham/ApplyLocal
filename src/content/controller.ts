@@ -156,7 +156,7 @@ export function startController(doc: Document, win: Window): () => void {
     if (!profile || !settings) return
     if (root === doc) {
       const adapter = selectAdapter(currentUrl(), doc, settings)
-      ats = adapter.id === 'greenhouse' || adapter.id === 'lever' || adapter.id === 'workday' ? adapter.id : 'generic'
+      ats = adapter.id === 'greenhouse' || adapter.id === 'lever' || adapter.id === 'workday' || adapter.id === 'ashby' ? adapter.id : 'generic'
     }
     const result = scanDocument(root, { url: currentUrl(), profile, settings })
     merge(result.fields)

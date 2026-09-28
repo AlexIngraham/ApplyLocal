@@ -5,18 +5,19 @@ import { checkboxShouldBeChecked, matchChoice, parseMoney, toDate, toMonth } fro
 import type { Choice } from '@/content/matchers'
 import { dateCandidatesForControl } from '@/content/dateFormat'
 
-type Tracked = HTMLInputElement & { _valueTracker?: { setValue: (value: string) => void } }
-
-export function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement, value: string): void {
-  const prototype = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+export function setNativeValue(el: HTMLInputElement | HTMLTextAreaElement, value: string, { blur = true }: { blur?: boolean } = {}): void {
+  const win = el.ownerDocument.defaultView ?? window
+  const prototype = el.localName === 'textarea' ? win.HTMLTextAreaElement.prototype : win.HTMLInputElement.prototype
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value')
-  const previous = el.value
-  if (typeof el.focus === 'function') el.focus({ preventScroll: true })
-  if (descriptor?.set) descriptor.set.call(el, value)
-  else el.value = value
-  const tracker = (el as Tracked)._valueTracker
-  if (tracker) tracker.setValue(previous === value ? `${previous} ` : previous)
-  dispatchValueEvents(el)
+  if (!descriptor?.set) throw new Error('Native value setter is unavailable.')
+  el.focus({ preventScroll: true })
+  // Bypass an instance setter (e.g. React's tracker) so the input event sees
+  // the real value transition. No private framework state needs to be changed.
+  descriptor.set.call(el, value)
+  dispatchValueEvents(el, value)
+  // Real blur also emits focusout, which React uses for onBlur/commit handlers.
+  // Search widgets opt out because blurring can close their pending options.
+  if (blur) el.blur()
 }
 
 export function setSelectValue(el: HTMLSelectElement, value: string): void {

@@ -86,7 +86,7 @@ async function fillCheckboxSkills(field: DetectedField, values: string[]): Promi
         // Existing user search text is protected just like other occupied editors.
         if (searchBefore.trim() && searchWritten === undefined) { details.failed.push(...skills.slice(position)); break }
         searchWritten = desired
-        withSyntheticFill(() => setNativeValue(search, desired))
+        withSyntheticFill(() => setNativeValue(search, desired, { blur: false }))
         await yieldDom()
         await waitUntil(() => cancelled() || lookup(desired).length > 0)
       }
@@ -119,7 +119,7 @@ async function fillCheckboxSkills(field: DetectedField, values: string[]): Promi
       const current = currentRoot()
       const search = current && skillSearch(current)
       if (!cancelled() && searchWritten !== undefined && search?.value === searchWritten) {
-        withSyntheticFill(() => setNativeValue(search, searchBefore ?? ''))
+        withSyntheticFill(() => setNativeValue(search, searchBefore ?? '', { blur: false }))
       }
     } finally {
       observer.disconnect()

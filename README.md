@@ -7,7 +7,7 @@ ApplyLocal is a Chrome extension that fills job applications from a profile stor
 - Manifest V3 extension (Chrome 111+)
 - Local profile: contact info, links, education, employment, skills, and reusable answers
 - One-click autofill from the popup
-- Generic HTML forms, Greenhouse, Lever, and Workday
+- Generic HTML forms, Greenhouse, Lever, Workday, and Ashby text fields
 - Custom dropdowns and comboboxes
 - Repeated employment and education sections
 - Multi-value skill selectors
@@ -23,6 +23,7 @@ ApplyLocal is a Chrome extension that fills job applications from a profile stor
 | Greenhouse | Supported on `*.greenhouse.io`, including iframes |
 | Lever | Supported on `*.lever.co`, including iframes |
 | Workday | Supported on `*.myworkdayjobs.com`, with employer-specific gaps |
+| Ashby | Controlled text inputs and textareas on `*.ashbyhq.com`; open the popup to scan |
 
 Greenhouse, Lever, and Workday get a content script automatically. Other sites are scanned only after you open the popup, using `activeTab` and `scripting`. There is no `<all_urls>` permission.
 
@@ -93,6 +94,12 @@ Put employment and education in the profile **most recent first**. The first sav
 
 Workday layouts differ by employer. Unrecognized widgets, ambiguous dropdowns, and some reordered cards still need manual review.
 
+## Ashby
+
+Open the popup on an Ashby application, then use **Autofill**. Text fields use native setters, input/change events, and a real blur to update controlled form state. The adapter checks that values survive rendering and flags visible validation failures for review. Existing values and manual edits remain protected.
+
+Ashby uses the existing `activeTab` injection path; no additional host permissions are requested. Custom dropdowns and uploads remain manual. See [Ashby verification and live QA](docs/ashby-qa.md) for test coverage and remaining checks.
+
 ## Backup
 
 In **Settings → Data**, **Export backup** downloads `job-autofill-backup-YYYY-MM-DD.json` with your profile and settings. **Import backup** shows a short summary, then **Replace profile and settings** writes both together. Cancel, invalid JSON, and unsupported versions leave storage unchanged. Saved applications are not included in the file. Export and import stay on your device.
@@ -114,7 +121,7 @@ In **Settings → Data**, **Export backup** downloads `job-autofill-backup-YYYY-
 ## Project structure
 
 ```text
-src/adapters/     generic, Greenhouse, Lever, Workday
+src/adapters/     generic, Greenhouse, Lever, Workday, Ashby
 src/classifier/   field rules and confidence
 src/content/      scanner, filler, dynamic forms
 src/profile/      local profile
