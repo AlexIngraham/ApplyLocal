@@ -1,6 +1,6 @@
 # Popup UX verification
 
-The redesign changes only popup presentation and UI state. Autofill, classification, ATS adapters, content scripts, profile/settings schemas, backup serialization, and application tracking storage are unchanged.
+This release pass changes popup copy, spacing and opening size. Autofill logic, ATS adapters, profile/settings schemas, backup serialization and application storage are unchanged.
 
 ## Automated checks
 
@@ -11,49 +11,37 @@ npm run build
 node scripts/smoke-popup.mjs
 ```
 
-Result: typecheck and production build passed; 191 tests in 13 files passed, including 11 new UI tests. The built bundle also passed the DOM smoke check.
+Typecheck, all 191 tests in 13 files (including 11 popup UI tests), the production build and the built-popup DOM smoke check pass.
 
-For real Chrome layout/interaction checks, launch an isolated browser (macOS example):
+For Chrome layout/interaction checks, launch an isolated browser (macOS example; Chrome for Testing also works):
 
 ```sh
 '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --disable-gpu --no-first-run --no-default-browser-check --user-data-dir=/tmp/applylocal-ui-chrome --remote-debugging-port=9333 about:blank
 ```
 
-Then, in a second terminal:
+Then run:
 
 ```sh
 node scripts/qa-popup.mjs
 ```
 
-This serves the actual `dist/` popup from a temporary localhost server, injects deterministic Chrome API fixtures, exercises keyboard/navigation/loading/save failures, and captures screenshots in `/tmp/applylocal-ui-qa`. It does not access your real profile or external job sites. The QA script closes its page/server; close the isolated Chrome process when finished.
+The harness serves `dist/` on localhost with deterministic Chrome API fixtures and writes screenshots to `/tmp/applylocal-ui-qa`. It does not access real profiles or live job sites. It closes its page/server; close the isolated browser when finished.
 
-Chrome checks passed at 380, 410 and 430px, including horizontal and vertical overflow, persistent panel scroll, keyboard tab/switch controls, reduced motion, entry removal, loading feedback, and save retry. Screenshots of Overview, Profile, education, experience, Settings, backup and save failure were visually inspected.
+The opening regression starts at 220 × 160 and asserts a 410 × 580 document, independent of the initial viewport. At a capped 498px height, every tab must retain at least 320px of content and backup actions must remain reachable by internal scrolling. The active panel fills the shell without page overflow. Alternate widths of 380px and 430px are applied explicitly by the harness; the native popup requests 410px.
 
-## Exact manual QA checklist
+Chrome for Testing 154 passed the opening, capped-height, width, keyboard, tab/accordion persistence, loading, save-retry, entry-removal and emulated reduced-motion checks. Completion feedback is awaited by state, avoiding a fixed-delay race. Screenshots of all tabs, open editors, backup controls and save errors were visually inspected.
 
-Load `dist/` as an unpacked extension in Chrome and open a job application. Use a disposable profile when testing replacement or deletion.
+## Manual release checks
 
-1. Open the popup: header appears promptly; local profile/settings remain available while page connection is pending.
-2. Switch Overview → Profile → Settings: the active pill glides to each tab in roughly 180ms.
-3. Switch back and rapidly alternate tabs: content moves in the matching direction without flashing or blocking clicks.
-4. Open and close each profile section: height expands/collapses smoothly in roughly 220ms.
-5. Watch section and entry chevrons: each rotates with the same timing and reflects its expanded state.
-6. Add several education/employment entries: collapsed cards show school/role, company/degree and dates; the popup has one content scrollbar.
-7. Add and remove an entry: new editor opens, entrance is subtle, removal fades/collapses, and focus returns to the Add action.
-8. Select Autofill page: Filling… appears, both page actions disable, repeated clicks do not send duplicate commands, and completion restores the controls.
-9. Edit profile and settings: Saving… changes quietly to Saved locally after the existing debounce. Navigate between tabs before saving and confirm edits remain.
-10. Test a restricted page and a failed storage write: inline error text gives a next step; successful save retry retains the input.
-11. Inspect at 380, 410 and 430px, including long URLs/names and open editors: no clipped controls or horizontal/page overflow.
-12. Navigate with Tab, Shift+Tab, arrows, Home, End, Enter and Space: one navigation tab is in the tab order, closed content is skipped, and focus remains visible.
-13. Enable the OS reduced-motion preference: tab, accordion, switch, spinner and entry animations stop; controls remain usable.
-14. Edit values, switch tabs, reopen sections and scroll: input/section state survives navigation; reopen the popup after Saved locally to confirm persistence. Export/import a backup through the native Chrome dialogs and confirm data is restored only after confirmation.
-15. On an actual application, verify scan/autofill and saved-application actions still behave as before. Never submit as part of UI QA.
+Load `dist/` as an unpacked extension. Use a disposable profile for replacement/deletion checks.
 
-The browser harness and unit tests cover these interactions with fixtures. Native toolbar-popup lifecycle, OS file-picker/download dialogs, external ATS pages and subjective motion feel remain manual release checks; no live ATS end-to-end test was performed in this session.
+1. Open from Chrome's toolbar, close and reopen: the popup requests approximately 410 × 580, never a tiny initial viewport. On a shorter display, all three tabs retain usable content and internal scrolling.
+2. Check Overview hierarchy: ApplyLocal → current site/ATS and fill counts → Autofill → Scan again. No promotional intro, redundant subtitle or submission reassurance. Check all tabs for clipped controls, horizontal scrolling and awkward gaps.
+3. Switch Overview → Profile → Settings and rapidly switch back: transitions stay smooth, content remains clickable, and profile input, accordion state and scroll position survive navigation.
+4. Open/close profile sections, add several entries, then remove one: height and chevrons animate together, new editors open, removed entries stop receiving focus, and focus returns to the Add action. Only the active panel scrolls.
+5. Use Tab, Shift+Tab, arrows, Home, End, Enter and Space: focus is visible, inactive panels/closed sections are skipped, and switches work. Enable OS reduced motion: tab, accordion, switch, spinner and entry animations stop. Check motion feel with both preferences.
+6. Select Autofill: Filling… appears, page actions disable until completion, and repeated clicks do not duplicate commands. Check unsupported-page errors and save failures for useful next steps; retry a failed save without losing edits.
+7. Edit profile/settings, wait for Saved locally, close and reopen: values persist. Export backup through the native download flow and verify the file. Import backup: the OS file chooser opens, a preview appears, Cancel preserves data, and replacement occurs only after confirmation. Backups contain personal data and exclude saved applications.
+8. Spot-check live Greenhouse, Lever and Workday applications: scan/autofill, review counts, field details and saved-application actions behave as before. Do not submit applications as part of UI QA.
 
-## Remaining UI limitations
-
-- Full dark mode, profile search and profile completion are intentionally deferred.
-- Large expanded field lists still require scrolling; collapsed sections reduce the default information load.
-- The existing API does not supply incremental fill progress, so the button uses a spinner and completion count rather than a fabricated percentage.
-- The existing autosave debounce remains 300ms for profile and 200ms for settings. Wait for Saved locally before closing the popup.
+The toolbar lifecycle, OS download/file-picker dialogs, live ATS pages and subjective motion feel require human release sign-off. Fixture checks and emulated reduced motion do not replace those checks.

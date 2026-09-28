@@ -75,7 +75,7 @@ export function App() {
       setPage(result)
       if (!result.error) {
         const filled = result.snapshot?.counts.autofilled ?? 0
-        setNotice(action === 'autofill' ? `${filled} ${filled === 1 ? 'field' : 'fields'} filled on this page.` : 'Scan complete. Page details are up to date.')
+        setNotice(action === 'autofill' ? `${filled} ${filled === 1 ? 'field' : 'fields'} filled.` : 'Scan complete.')
       }
     } catch {
       setActionError('Could not connect to this page. Open a job application, refresh it, then scan again.')
@@ -84,7 +84,7 @@ export function App() {
   const saveError = profileSave.status === 'error' || settingsSave.status === 'error'
   const saving = profileSave.status === 'saving' || settingsSave.status === 'saving'
   return <main className="app">
-    <header className="top"><div className="brand"><span className="mark"><Icon name="check" /></span><div><strong>ApplyLocal</strong><small>Your next application, simplified.</small></div></div>
+    <header className="top"><div className="brand"><span className="mark"><Icon name="check" /></span><div><strong>ApplyLocal</strong><small>Applications, done easy</small></div></div>
       <span className="save-status" role="status" data-error={saveError}><Icon name={saveError ? 'warning' : saving ? 'spinner' : 'check'} className={saving ? 'spin' : ''} />{saveError ? 'Not saved' : saving ? 'Saving…' : 'Saved locally'}</span>
     </header>
     {saveError && <div className="save-error"><StatusMessage tone="error">Changes could not be saved. Keep this popup open and retry.<br /><Button onClick={() => { profileSave.retry(); settingsSave.retry() }}>Retry save</Button></StatusMessage></div>}

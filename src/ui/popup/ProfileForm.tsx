@@ -30,8 +30,8 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
 
   return (
     <div className="stack">
-      <div className="page-heading"><div><h1>Your profile</h1><p>Reusable details for every application.</p></div><Badge>Local only</Badge></div>
-      <Accordion title="Personal information" icon="user" summary={[profile.personal.firstName, profile.personal.lastName].filter(Boolean).join(' ') || 'Your name and preferred name'} defaultOpen>
+      <div className="page-heading"><h1>Profile</h1><Badge>Local only</Badge></div>
+      <Accordion title="Personal information" icon="user" summary={[profile.personal.firstName, profile.personal.lastName].filter(Boolean).join(' ') || 'Name and preferred name'} defaultOpen>
         <div className="grid">
           <Text label="First name" value={profile.personal.firstName} onChange={(firstName) => patch({ personal: { ...profile.personal, firstName } })} />
           <Text label="Middle name" value={profile.personal.middleName} onChange={(middleName) => patch({ personal: { ...profile.personal, middleName } })} />
@@ -53,7 +53,7 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
           <Text label="Country" value={profile.personal.country} onChange={(country) => patch({ personal: { ...profile.personal, country } })} />
         </div>
       </Accordion>
-      <Accordion title="Links" icon="link" summary="LinkedIn, GitHub and your work">
+      <Accordion title="Links" icon="link" summary="LinkedIn, GitHub and websites">
         <div className="grid">
           <Text label="LinkedIn" value={profile.links.linkedin} onChange={(linkedin) => patch({ links: { ...profile.links, linkedin } })} />
           <Text label="GitHub" value={profile.links.github} onChange={(github) => patch({ links: { ...profile.links, github } })} />
@@ -63,7 +63,7 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
         </div>
       </Accordion>
       <Accordion title="Education" icon="education" summary={profile.education.length ? `${profile.education.length} saved ${profile.education.length === 1 ? 'entry' : 'entries'}` : 'Schools, degrees and dates'} badge={<Badge>{profile.education.length}</Badge>}>
-        {!profile.education.length && <EmptyState>No education added yet. Add a school to fill education sections.</EmptyState>}
+        {!profile.education.length && <EmptyState>No education added.</EmptyState>}
         {profile.education.map((entry, index) => (
           <EducationCard
             key={entry.id}
@@ -76,7 +76,7 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
         <Button className="add-entry" icon="plus" onClick={() => patch({ education: [...profile.education, emptyEducation()] })}>Add education</Button>
       </Accordion>
       <Accordion title="Work experience" icon="work" summary={profile.employment.length ? `${profile.employment.length} saved ${profile.employment.length === 1 ? 'role' : 'roles'} · Most recent first` : 'Roles, companies and dates'} badge={<Badge>{profile.employment.length}</Badge>}>
-        {!profile.employment.length && <EmptyState>No work experience added yet. Add an experience to fill employment sections.</EmptyState>}
+        {!profile.employment.length && <EmptyState>No work experience added.</EmptyState>}
         {profile.employment.map((entry, index) => (
           <EmploymentCard
             key={entry.id}
@@ -89,7 +89,7 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
         <Button className="add-entry" icon="plus" onClick={() => patch({ employment: [...profile.employment, emptyEmployment()] })}>Add experience</Button>
       </Accordion>
       <Accordion title="Skills & resume" icon="skills" summary={profile.skills.filter(skill => skill.trim()).length ? `${profile.skills.filter(skill => skill.trim()).length} skills saved` : 'Technical skills and resume reminder'}>
-        {!profile.skills.some(skill => skill.trim()) && <EmptyState>No skills saved. Add your technical skills for skill selectors.</EmptyState>}
+        {!profile.skills.some(skill => skill.trim()) && <EmptyState>No skills added.</EmptyState>}
         <label>
           <span>Skills <small>· One per line</small></span>
           <textarea
@@ -124,10 +124,10 @@ export function ProfileForm({ profile, sensitiveLocked, onChange, onSample, onCl
           <Text label="Years of experience" value={profile.defaults.yearsOfExperience} onChange={(yearsOfExperience) => patch({ defaults: { ...profile.defaults, yearsOfExperience } })} />
         </div>
       </Accordion>
-      <Accordion title="Demographics" icon="shield" summary="Optional · Only answers you choose to save" badge={<Badge>{sensitiveLocked ? 'Autofill off' : 'Autofill on'}</Badge>}>
+      <Accordion title="Demographics" icon="shield" summary="Optional saved answers" badge={<Badge>{sensitiveLocked ? 'Autofill off' : 'Autofill on'}</Badge>}>
         <p className="quiet">
-          These answers are stored locally and never inferred. Autofill requires an exact saved answer and the global sensitive-demographics setting.
-          {sensitiveLocked ? ' The global setting currently blocks all of them.' : ''}
+          Stored locally; never inferred. Autofill requires an exact saved answer and demographic autofill enabled in Settings.
+          {sensitiveLocked ? ' Demographic autofill is off.' : ''}
         </p>
         {SENSITIVE_CATEGORIES.map((category) => (
           <div className="sensitive" key={category}>

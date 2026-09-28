@@ -134,7 +134,7 @@ describe('settings, backup and page actions', () => {
     await click(switches[4]); await tick(200)
     expect(stored.settings).toMatchObject({ autofillSensitiveDemographics: true, neverAutofillSensitive: false })
     await click(button('Overview'))
-    expect(button('Autofill page').disabled).toBe(true)
+    expect(button('Autofill').disabled).toBe(true)
   })
   it('does not activate a disabled toggle', async () => {
     const change = vi.fn()
@@ -146,21 +146,21 @@ describe('settings, backup and page actions', () => {
   it('calls existing scan/autofill commands and prevents repeats while displaying progress', async () => {
     let finish!: (page: PageState) => void
     vi.mocked(runPageCommand).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
-    await mount(); await click(button('Autofill page'))
+    await mount(); await click(button('Autofill'))
     expect(button('Filling…').disabled).toBe(true)
     await click(button('Filling…'))
     expect(runPageCommand).toHaveBeenCalledTimes(1)
     expect(runPageCommand).toHaveBeenCalledWith('al:autofill')
     await act(async () => finish(page))
-    expect(host.textContent).toContain('18 fields filled on this page.')
+    expect(host.textContent).toContain('18 fields filled.')
     await click(button('Scan again'))
     expect(runPageCommand).toHaveBeenLastCalledWith('al:scan')
   })
   it('recovers the action buttons after command failure and explains next steps', async () => {
     vi.mocked(runPageCommand).mockRejectedValueOnce(new Error('Disconnected'))
-    await mount(); await click(button('Autofill page'))
+    await mount(); await click(button('Autofill'))
     expect(host.textContent).toContain('refresh it, then scan again')
-    expect(button('Autofill page').disabled).toBe(false)
+    expect(button('Autofill').disabled).toBe(false)
   })
   it('exports a backup and keeps import reachable through the file picker', async () => {
     const createURL = vi.fn(() => 'blob:test')

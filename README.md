@@ -51,7 +51,7 @@ The unpacked extension is the `dist/` directory.
 3. Click **Load unpacked**.
 4. Select the `dist` folder in this project.
 
-Open a job form, or run the local demo below, then open the ApplyLocal popup. On a generic page, use **Scan again** or **Autofill page**.
+Open a job form, or run the local demo below, then open the ApplyLocal popup. On a generic page, use **Scan again** or **Autofill**.
 
 ## Development
 

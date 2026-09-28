@@ -47,7 +47,7 @@ export function BackupData({ profile, settings, onRestore }: {
     } catch { setError(true); setMessage('Could not save the backup. Please try again.') }
     finally { setBusy(false) }
   }
-  return <SectionCard title="Data & backup" icon="download"><div className="stack">
+  return <SectionCard title="Backup" icon="download"><div className="stack">
     <p className="quiet">Backups contain personal information. Store them securely. Saved applications are not included.</p>
     <div className="actions">
       <Button icon="download" disabled={busy} onClick={exportFile}>Export backup</Button>

@@ -25,7 +25,6 @@ export function Overview({ page, applications, busy, enabled, notice, actionErro
   const fields = [...(page?.snapshot?.fields ?? [])].sort((a, b) => rank(a.status) - rank(b.status))
   return (
     <div className="stack">
-      <div className="page-heading"><div><h1>Ready when you are.</h1><p>Your details. Fewer repetitive fields.</p></div></div>
       {!enabled && <StatusMessage tone="warning">ApplyLocal is paused.<br /><Button onClick={onOpenSettings}>Open settings</Button></StatusMessage>}
       <div className="site-card">
         <p className="eyebrow">Current page</p>
@@ -33,22 +32,21 @@ export function Overview({ page, applications, busy, enabled, notice, actionErro
         <div className="stats">
           <Stat label="Detected" value={counts?.detected} />
           <Stat label="Filled" value={counts?.autofilled} tone="success" />
-          <Stat label="Review" value={counts?.review} tone="warning" />
+          <Stat label="Needs review" value={counts?.review} tone="warning" />
           <Stat label="Skipped" value={counts?.skipped} />
         </div>
       </div>
       {page?.error && <StatusMessage tone="error">{page.error} Open a job application and reopen this popup to reconnect.</StatusMessage>}
       {actionError && <StatusMessage tone="error">{actionError}</StatusMessage>}
       <div className="actions primary-actions" aria-busy={busy !== null}>
-        <Button variant="primary" icon={busy === 'autofill' ? 'spinner' : 'arrow'} disabled={!!busy || !enabled || !page || !!page.error} onClick={onAutofill}>{busy === 'autofill' ? 'Filling…' : 'Autofill page'}</Button>
+        <Button variant="primary" icon={busy === 'autofill' ? 'spinner' : 'arrow'} disabled={!!busy || !enabled || !page || !!page.error} onClick={onAutofill}>{busy === 'autofill' ? 'Filling…' : 'Autofill'}</Button>
         <Button icon={busy === 'scan' ? 'spinner' : 'refresh'} disabled={!!busy || !enabled || !page} onClick={onScan}>{busy === 'scan' ? 'Scanning…' : 'Scan again'}</Button>
       </div>
-      <p className="action-note">You stay in control. Nothing is submitted for you.</p>
       {notice && !actionError && <StatusMessage tone="success">{notice}</StatusMessage>}
-      {!!counts?.review && <StatusMessage tone="warning">{counts.review} {counts.review === 1 ? 'field needs' : 'fields need'} review. Check the suggestions before submitting.</StatusMessage>}
-      {counts ? <p className="quiet">{counts.unrecognized} unclear {counts.unrecognized === 1 ? 'field was' : 'fields were'} left untouched.</p> : !page?.error && <EmptyState>Open an application form to see recognized fields here.</EmptyState>}
+      {!!counts?.unrecognized && <p className="quiet">{counts.unrecognized} unrecognized {counts.unrecognized === 1 ? 'field' : 'fields'} left unchanged.</p>}
+      {!counts && !page?.error && <EmptyState>Open an application form to scan fields.</EmptyState>}
       {fields.length ? (
-        <Accordion title="Field details" icon="overview" summary={`${fields.length} fields · Review suggestions first`}>
+        <Accordion title="Field details" icon="overview" summary={`${fields.length} fields`}>
         <ul className="fields">
           {fields.map((field) => (
             <li key={field.id}>
@@ -65,8 +63,8 @@ export function Overview({ page, applications, busy, enabled, notice, actionErro
         </ul>
         </Accordion>
       ) : null}
-      <Accordion title="Saved applications" icon="work" summary={applications.length ? `${applications.length} saved on this device` : 'Keep track after you submit'}>
-        {applications.length === 0 ? <EmptyState>When you submit an application yourself, ApplyLocal can ask to save it here.</EmptyState> : null}
+      <Accordion title="Saved applications" icon="work" summary={`${applications.length} saved`}>
+        {applications.length === 0 ? <EmptyState>No saved applications.</EmptyState> : null}
         <ul className="applications">
           {applications.map((application) => (
             <li key={application.id}>

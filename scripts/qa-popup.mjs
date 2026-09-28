@@ -36,15 +36,24 @@ async function evaluate(expression) {
   return result.result.value
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+async function waitFor(expression, message) {
+  const deadline = Date.now() + 5000
+  while (Date.now() < deadline) {
+    if (await evaluate(expression)) return
+    await wait(50)
+  }
+  assert.fail(message)
+}
 async function screenshot(name) { const { data } = await send('Page.captureScreenshot'); await writeFile(`${artifacts}/${name}.png`, Buffer.from(data, 'base64')) }
 async function click(text) { await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(text)}).click()`); await wait(260) }
 async function accordion(title) { await evaluate(`[...document.querySelectorAll('.accordion-trigger')].find(b => b.querySelector('strong').textContent === ${JSON.stringify(title)}).click()`); await wait(260) }
 async function noOverflow() {
-  const result = await evaluate(`(() => { const p = document.querySelector('.panel[data-active="true"]'); return { page: document.documentElement.scrollWidth <= innerWidth, vertical: document.documentElement.scrollHeight <= innerHeight, panel: p.scrollWidth <= p.clientWidth, clipped: [...p.querySelectorAll('input, select, textarea, button')].filter(e => !e.closest('[inert]') && e.getBoundingClientRect().right > p.getBoundingClientRect().right + 1).length } })()`)
-  assert.deepEqual(result, { page: true, vertical: true, panel: true, clipped: 0 })
+  const result = await evaluate(`(() => { const p = document.querySelector('.panel[data-active="true"]'); const bottom = document.querySelector('.app').getBoundingClientRect().bottom; return { page: document.documentElement.scrollWidth <= innerWidth, vertical: bottom <= innerHeight, fillsShell: Math.abs(p.getBoundingClientRect().bottom - bottom) <= 1, panel: p.scrollWidth <= p.clientWidth, clipped: [...p.querySelectorAll('input, select, textarea, button')].filter(e => !e.closest('[inert]') && e.getBoundingClientRect().right > p.getBoundingClientRect().right + 1).length } })()`)
+  assert.deepEqual(result, { page: true, vertical: true, fillsShell: true, panel: true, clipped: 0 })
 }
 try {
   await send('Page.enable'); await send('Runtime.enable')
+  await send('Page.bringToFront')
   await send('Emulation.setDeviceMetricsOverride', { width: 220, height: 160, deviceScaleFactor: 1, mobile: false })
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.__writes = []; window.__commands = []; window.__fail = false;
@@ -55,18 +64,18 @@ try {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/src/ui/popup/index.html` }); await wait(450)
   // Chrome starts an action popup small, then sizes it from its document.
   // A viewport-dependent root can lock that initial size and collapse the panel.
-  const openingSize = await evaluate(`({ width: document.documentElement.getBoundingClientRect().width, height: document.querySelector('.app').getBoundingClientRect().height, panel: document.querySelector('.panel[data-active="true"]').getBoundingClientRect().height })`)
+  const openingSize = await evaluate(`({ width: document.documentElement.getBoundingClientRect().width, height: document.documentElement.getBoundingClientRect().height })`)
   assert.equal(openingSize.width, 410, 'Popup must request its full width even in a small initial viewport')
-  assert.ok(openingSize.height >= 450 && openingSize.height <= 600, 'Popup must grow to show its content')
-  assert.ok(openingSize.panel >= 320, 'Active panel must not collapse during opening')
+  assert.equal(openingSize.height, 580, 'Popup must request its full height during opening')
   await send('Emulation.setDeviceMetricsOverride', { width: 410, height: Math.ceil(openingSize.height), deviceScaleFactor: 1, mobile: false })
   assert.equal(await evaluate(`document.querySelector('[role="tab"][aria-selected="true"]').textContent`), 'Overview')
+  assert.ok(await evaluate(`document.querySelector('.panel[data-active="true"]').getBoundingClientRect().height >= 320`), 'Active panel must have usable space after opening')
   await noOverflow(); await screenshot('overview-410')
-  await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Autofill page').click()`)
+  await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Autofill').click()`)
   await wait(100)
   assert.equal(await evaluate(`[...document.querySelectorAll('button')].find(b => b.textContent === 'Filling…').disabled`), true)
-  await screenshot('autofill-loading'); await wait(700)
-  assert.equal(await evaluate(`document.body.textContent.includes('18 fields filled on this page.')`), true)
+  await screenshot('autofill-loading')
+  await waitFor(`document.body.textContent.includes('18 fields filled.')`, 'Autofill must report the completed field count')
   await click('Profile'); await noOverflow(); await screenshot('profile-410')
   await accordion('Personal information')
   await accordion('Education'); await accordion('Northeastern University'); await noOverflow(); await screenshot('education-410')
@@ -78,6 +87,17 @@ try {
   await click('Profile')
   assert.equal(await evaluate(`document.querySelector('#panel-profile').scrollTop`), scroll)
   assert.equal(await evaluate(`[...document.querySelectorAll('.accordion-trigger')].find(b => b.querySelector('strong').textContent === 'Work experience').getAttribute('aria-expanded')`), 'true')
+  // Chrome may cap the native popup height on shorter displays.
+  await send('Emulation.setDeviceMetricsOverride', { width: 410, height: 498, deviceScaleFactor: 1, mobile: false })
+  for (const tab of ['Overview', 'Profile', 'Settings']) {
+    await click(tab); await noOverflow()
+    assert.ok(await evaluate(`document.querySelector('.panel[data-active="true"]').clientHeight >= 320`), `${tab} must remain usable at a capped height`)
+    await screenshot(`${tab.toLowerCase()}-410x498`)
+  }
+  await evaluate(`document.querySelector('#panel-settings').scrollTop = 9999`)
+  assert.equal(await evaluate(`(() => { const p = document.querySelector('#panel-settings'); const b = [...p.querySelectorAll('button')].find(b => b.textContent === 'Import backup'); return p.scrollTop > 0 && b.getBoundingClientRect().bottom <= p.getBoundingClientRect().bottom })()`), true, 'Backup actions must remain reachable by internal scrolling')
+  assert.equal(await evaluate(`document.documentElement.getBoundingClientRect().height`), 580, 'Capping the viewport must not shrink the requested document height')
+  await evaluate(`document.querySelector('#panel-settings').scrollTop = 0`)
   // Explicit alternate shell sizes test responsive contents without reintroducing
   // viewport-dependent sizing into the native action popup.
   for (const width of [380, 430]) {
@@ -123,7 +143,7 @@ try {
   assert.equal(await evaluate(`document.querySelectorAll('#panel-profile .entry-card').length`), entries - 1)
   assert.equal(await evaluate(`document.activeElement.textContent`), 'Add experience')
   assert.deepEqual(errors, [])
-  console.log(`Built Chrome QA passed: small-viewport opening, 380/410/430px, overflow, tab/accordion persistence, actions/loading, keyboard switch/navigation, reduced motion. Screenshots: ${artifacts}`)
+  console.log(`Built Chrome QA passed: 410 × 580 opening from 220 × 160, capped 498px height, 380/410/430px widths, overflow/internal scrolling, tab/accordion persistence, actions/loading, keyboard switch/navigation, reduced motion. Screenshots: ${artifacts}`)
 } finally {
   await send('Page.close').catch(() => {})
   ws.close(); server.close()
