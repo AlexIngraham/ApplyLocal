@@ -1,131 +1,76 @@
 # ApplyLocal
 
-ApplyLocal is a Chrome extension that fills job applications from a profile stored on this device. It scans the form, fills fields it recognizes with high confidence, and leaves the rest for you to review. You submit the application yourself.
+Chrome extension (MV3, Chrome 111+) that autofills job applications from a local profile. High-confidence fields are filled; the rest stay for your review. You submit the application yourself.
 
-## Features
+## Platforms
 
-- Manifest V3 extension (Chrome 111+)
-- Local profile: contact info, links, education, employment, skills, and reusable answers
-- One-click autofill from the popup
-- Generic HTML forms, Greenhouse, Lever, Workday, and Ashby text fields
-- Custom dropdowns and comboboxes
-- Repeated employment and education sections
-- Multi-value skill selectors
-- Confidence scoring, with on-page indicators for filled, suggested, and skipped fields
-- Local JSON export and import of your profile and settings
-- Optional local application log that asks before saving
-
-## Supported platforms
-
-| Platform | Support |
+| Platform | How |
 | --- | --- |
-| Generic HTML | Supported when you open the popup on that tab |
-| Greenhouse | Supported on `*.greenhouse.io`, including iframes |
-| Lever | Supported on `*.lever.co`, including iframes |
-| Workday | Supported on `*.myworkdayjobs.com`, with employer-specific gaps |
-| Ashby | Controlled text inputs and textareas on `*.ashbyhq.com`; open the popup to scan |
+| Greenhouse | `*.greenhouse.io` (content script, iframes) |
+| Lever | `*.lever.co` (content script, iframes) |
+| Workday | `*.myworkdayjobs.com` (employer-specific gaps) |
+| Ashby | `*.ashbyhq.com` text fields/textareas (popup scan) |
+| Generic HTML | Popup on that tab (`activeTab` + `scripting`) |
 
-Greenhouse, Lever, and Workday get a content script automatically. Other sites are scanned only after you open the popup, using `activeTab` and `scripting`. There is no `<all_urls>` permission.
+No `<all_urls>`. Permissions: `storage`, `activeTab`, `scripting`.
 
 ## Privacy
 
-- Profile, settings, and saved applications stay in `chrome.storage.local` on this device.
-- No account, backend, or analytics service is required.
-- ApplyLocal does not click Submit.
-- It does not rewrite job URLs or add referral parameters.
-- Race, ethnicity, gender, disability, veteran status, religion, and sexual orientation are not inferred. Those questions stay manual unless you explicitly enable autofill for that category.
-- Backup files are plaintext and can include contact details and demographic answers. Store them securely.
+Data stays in `chrome.storage.local`. No account, backend, or analytics. No Submit clicks or URL rewriting. Demographic questions are skipped unless you enable that category. Backups are plaintext JSON—store them securely.
 
-Permissions are `storage`, `activeTab`, and `scripting`.
-
-## Installation
+## Install
 
 ```bash
-npm install
-npm run build
+npm install && npm run build
 ```
 
-The unpacked extension is the `dist/` directory.
-
-1. Open `chrome://extensions`.
-2. Turn on **Developer mode**.
-3. Click **Load unpacked**.
-4. Select the `dist` folder in this project.
-
-Open a job form, or run the local demo below, then open the ApplyLocal popup. On a generic page, use **Scan again** or **Autofill**.
+Load unpacked from `dist/` at `chrome://extensions` (Developer mode). Open a job form or `npm run demo`, then the popup. On generic pages: **Scan again** or **Autofill**.
 
 ## Development
 
 ```bash
-npm run typecheck
-npm test
-npm run test:watch
-npm run watch
-npm run build
-npm run demo
+npm run typecheck && npm test && npm run build
+npm run watch    # rebuild on edit (run build once first)
+npm run demo     # http://localhost:4173
 ```
 
-`npm run build` typechecks, bundles the popup, content script, and service worker, and checks that `dist/` is loadable. `npm run watch` rebuilds those bundles as you edit. Run `npm run build` once before watching so `dist/` already contains the manifest and icons.
+Reload the extension and refresh the application tab after changes. Always load `dist/`, not the repo root.
 
-After source changes, reload ApplyLocal on `chrome://extensions` and refresh the application tab so the page picks up the new content script. Keep loading `dist/`, not the repository root.
-
-`npm run demo` serves the static forms in `demo/` at `http://localhost:4173`.
-
-## How it works
+## Behavior
 
 ```text
-Page scanner
-→ field classifier
-→ ATS adapter
-→ profile resolver
-→ autofill
-→ user review
+scanner → classifier → ATS adapter → profile resolver → autofill → review
 ```
 
-The scanner reads each control’s label, name, placeholder, nearby text, and options. The classifier maps that text to a profile field and a score from 0 to 1. At **0.90** or above, an empty field is filled when automatic fill is on. From **0.65 to 0.89**, ApplyLocal shows a suggestion and leaves the field alone. Below **0.65**, it does nothing. Thresholds are adjustable in Settings.
+The classifier scores each field 0–1. **≥0.90** fills empty fields (when enabled); **0.65–0.89** suggests only; below that, skip. Thresholds in Settings.
 
-Text, email, phone, number, textarea, select, radio, and checkbox controls are supported, including React- and Vue-style inputs. File uploads, including resumes, are never filled. A value you have already typed is not overwritten.
+Supports text, email, phone, number, textarea, select, radio, checkbox, and custom comboboxes (including React/Vue inputs). Never fills file uploads or overwrites your edits.
 
-## Workday
+**Workday:** comboboxes, repeated employment/education cards, multi-step re-renders, skill chips (one unambiguous match at a time). Profile entries **most recent first** map to cards in order. Does not click Add/Next/Save/Submit.
 
-Workday support covers common text fields, custom comboboxes, repeated employment and education cards, multi-step pages that re-render, and skill-chip inputs. Skills are entered one match at a time when the option is unambiguous.
+**Ashby:** controlled text fields via popup scan. Custom dropdowns and uploads stay manual. Details: [docs/ashby-qa.md](docs/ashby-qa.md).
 
-Put employment and education in the profile **most recent first**. The first saved entry maps to the first card. ApplyLocal does not click Add, Next, Save, or Submit.
-
-Workday layouts differ by employer. Unrecognized widgets, ambiguous dropdowns, and some reordered cards still need manual review.
-
-## Ashby
-
-Open the popup on an Ashby application, then use **Autofill**. Text fields use native setters, input/change events, and a real blur to update controlled form state. The adapter checks that values survive rendering and flags visible validation failures for review. Existing values and manual edits remain protected.
-
-Ashby uses the existing `activeTab` injection path; no additional host permissions are requested. Custom dropdowns and uploads remain manual. See [Ashby verification and live QA](docs/ashby-qa.md) for test coverage and remaining checks.
-
-## Backup
-
-In **Settings → Data**, **Export backup** downloads `job-autofill-backup-YYYY-MM-DD.json` with your profile and settings. **Import backup** shows a short summary, then **Replace profile and settings** writes both together. Cancel, invalid JSON, and unsupported versions leave storage unchanged. Saved applications are not included in the file. Export and import stay on your device.
+**Backup:** Settings → Data exports/imports profile and settings (not saved applications). Invalid or cancelled import leaves storage unchanged.
 
 ## Limitations
 
-- Some employer-specific widgets and closed shadow roots still need manual entry.
-- Resume files are not parsed or uploaded. You can store a filename as a reminder.
-- Dropdowns are filled only when one option matches clearly.
-- ApplyLocal never submits the application.
-- Sites without a dedicated adapter use the generic scanner, and only after you open the popup.
+Employer-specific widgets, closed shadow roots, and ambiguous dropdowns may need manual entry. No resume parse/upload (filename reminder only). No auto-submit.
 
 ## Roadmap
 
 - More ATS adapters
-- Resume parsing into the local profile
-- Further Workday coverage for employer-specific controls
+- resume parsing
+- deeper Workday coverage
+- careerpuck compatability
 
-## Project structure
+## Layout
 
 ```text
 src/adapters/     generic, Greenhouse, Lever, Workday, Ashby
-src/classifier/   field rules and confidence
-src/content/      scanner, filler, dynamic forms
-src/profile/      local profile
-src/ui/popup/     extension popup
+src/classifier/   rules and confidence
+src/content/      scan, fill, dynamic forms
+src/profile/      storage and resolution
+src/ui/popup/     popup UI
 demo/             static forms
-tests/            classifier, fixtures, and fill tests
+tests/            fixtures and fill tests
 ```
